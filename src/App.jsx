@@ -137,7 +137,7 @@ Prestige, timeless elegance, cinematic luxury. Barathea wool and satin sheen con
 // Default selection (first 5 for generation)
 
 // ─── APIs ─────────────────────────────────────────────────────────────────────
-async function analyzeAndBuildPrompt(frontBase64, backBase64, productInfo, userGuide, scene, modelBase64) {
+async function analyzeAndBuildPrompt(frontBase64, backBase64, productInfo, userGuide, scene, modelBase64, anthropicKey) {
   // Step 1: Claude analyzes the garment and extracts key details
   const analysisParts = [
     { type: "image", source: { type: "base64", media_type: "image/jpeg", data: frontBase64 } },
@@ -286,10 +286,10 @@ async function editImage(currentBase64, frontBase64, instruction, geminiKey, bac
   throw new Error(data.error?.message || "Error editando");
 }
 
-async function generateSEO(productInfo) {
-  const res = await fetch("/api/claude", {
+async function generateSEO(productInfo, anthropicKey) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-api-key": anthropicKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1500,
@@ -474,6 +474,7 @@ export default function MandarinaPro() {
   const [photoBack, setPhotoBack] = useState(null);
   const [photoModel, setPhotoModel] = useState(null);
   const [geminiKey, setGeminiKey] = useState(() => sessionStorage.getItem('mk_g') || "");
+  const [anthropicKey, setAnthropicKey] = useState(() => sessionStorage.getItem('mk_a') || "");
   const [keyValid, setKeyValid] = useState(null);
   const [promptGuide, setPromptGuide] = useState("");
   const [productInfo, setProductInfo] = useState({ name:"", price:"", category:"Ropa", description:"", color:"" });
@@ -513,7 +514,7 @@ export default function MandarinaPro() {
 
     // SEO en paralelo
     setLoadingSEO(true);
-    const seoPromise = generateSEO(productInfo)
+    const seoPromise = generateSEO(productInfo, anthropicKey)
       .then(r => {
         if(r.result){
           setSeo(r.result.shopify);
@@ -537,7 +538,7 @@ export default function MandarinaPro() {
       let prompt = "";
       try {
         const modelB64 = photoModel ? dataUrlToBase64(photoModel) : null;
-        const r = await analyzeAndBuildPrompt(frontB64, backB64, productInfo, promptGuide, scene, modelB64);
+        const r = await analyzeAndBuildPrompt(frontB64, backB64, productInfo, promptGuide, scene, modelB64, anthropicKey);
         prompt = r.prompt;
         addToken({type:"text", label:`Análisis ${scene.label}`, tokens:r.tokens});
       } catch(e) {
@@ -564,16 +565,17 @@ export default function MandarinaPro() {
 
   const regenerateSEO = async () => {
     if (!productInfo.name.trim()) { alert('Primero llena el nombre del producto'); return; }
+    if (!anthropicKey) { alert('Necesitas agregar tu Anthropic API Key. Haz click en 🔑 en el header.'); setTempGeminiKey(geminiKey); setTempAnthKey(''); setShowKeySetup(true); return; }
     setLoadingSEO(true);
     setSeo(null); setIg(null);
     try {
-      const r = await generateSEO(productInfo);
+      const r = await generateSEO(productInfo, anthropicKey);
       if (r.result) {
         setSeo(r.result.shopify);
         setIg(r.result.instagram);
         setTokens(prev => [...prev, { type:"text", label:"SEO regenerado", tokens:r.tokens }]);
       } else {
-        alert('Error generando copy. Verifica que ANTHROPIC_API_KEY esté configurada en Vercel.');
+        alert('Error generando copy. Verifica tu Anthropic API Key haciendo click en 🔑');
       }
     } catch(e) {
       console.error('SEO regen:', e);
@@ -622,11 +624,17 @@ export default function MandarinaPro() {
                 <div style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>Configura tus API keys una sola vez</div>
               </div>
 
-              <div style={{marginBottom:16}}>
-                <div style={{fontSize:11,color:"#ffd060",marginBottom:6,fontWeight:"bold"}}>🔑 Gemini API Key <span style={{color:"rgba(255,200,50,0.5)",fontSize:9}}>(para generar imágenes)</span></div>
+              <div style={{marginBottom:14}}>
+                <div style={{fontSize:11,color:"#ffd060",marginBottom:6,fontWeight:"bold"}}>🖼️ Gemini API Key <span style={{color:"rgba(255,200,50,0.5)",fontSize:9}}>(para generar imágenes)</span></div>
                 <input value={tempGeminiKey} onChange={e=>setTempGeminiKey(e.target.value)} placeholder="AIzaSy..." type="password"
                   style={{width:"100%",padding:"10px 14px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,200,50,0.25)",borderRadius:10,color:"#f5f0eb",fontSize:13,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
                 <div style={{fontSize:9,color:"rgba(255,255,255,0.25)",marginTop:4}}>aistudio.google.com/apikey · ~$0.04/imagen</div>
+              </div>
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:11,color:"#ff9f5a",marginBottom:6,fontWeight:"bold"}}>🤖 Anthropic API Key <span style={{color:"rgba(255,140,66,0.5)",fontSize:9}}>(para SEO y copy)</span></div>
+                <input value={tempAnthKey} onChange={e=>setTempAnthKey(e.target.value)} placeholder="sk-ant-api03-..." type="password"
+                  style={{width:"100%",padding:"10px 14px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,140,66,0.25)",borderRadius:10,color:"#f5f0eb",fontSize:13,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+                <div style={{fontSize:9,color:"rgba(255,255,255,0.25)",marginTop:4}}>console.anthropic.com/settings/keys · Para SEO, copy e Instagram</div>
               </div>
 
               <button
@@ -634,11 +642,15 @@ export default function MandarinaPro() {
                   if(!tempGeminiKey.trim()) return;
                   sessionStorage.setItem('mk_g', tempGeminiKey.trim());
                   setGeminiKey(tempGeminiKey.trim());
+                  if(tempAnthKey.trim()) {
+                    sessionStorage.setItem('mk_a', tempAnthKey.trim());
+                    setAnthropicKey(tempAnthKey.trim());
+                  }
                   setShowKeySetup(false);
                 }}
                 disabled={!tempGeminiKey.trim()}
                 style={{width:"100%",padding:"13px",background:tempGeminiKey.trim()?"linear-gradient(135deg,#ff8c42,#e63946)":"rgba(255,255,255,0.08)",border:"none",borderRadius:11,color:tempGeminiKey.trim()?"#fff":"rgba(255,255,255,0.3)",fontSize:14,fontWeight:"bold",cursor:tempGeminiKey.trim()?"pointer":"not-allowed",fontFamily:"inherit",marginBottom:10}}>
-                Guardar y continuar →
+                Guardar keys y continuar →
               </button>
               <div style={{textAlign:"center",fontSize:10,color:"rgba(255,255,255,0.25)"}}>Las keys se guardan en tu sesión del navegador, no en servidores</div>
             </div>
@@ -870,7 +882,7 @@ export default function MandarinaPro() {
                 {!loadingSEO&&!seo?.title&&<div style={{textAlign:"center",padding:"20px",background:"rgba(255,140,66,0.06)",borderRadius:12,marginBottom:12}}>
                   <div style={{fontSize:13,color:"rgba(255,255,255,0.4)",marginBottom:8}}>Sin contenido generado aún</div>
                   <div style={{fontSize:11,color:"rgba(255,255,255,0.25)",marginBottom:12}}>Asegúrate de haber llenado nombre, precio y descripción del producto</div>
-                  <button onClick={()=>regenerateSEO()} style={{padding:"9px 20px",background:"linear-gradient(135deg,#ff8c42,#e63946)",border:"none",borderRadius:9,color:"#fff",fontSize:12,fontWeight:"bold",cursor:"pointer",fontFamily:"inherit"}}>⚡ Generar copy ahora</button>
+                  <button onClick={()=>anthropicKey?regenerateSEO():(setTempGeminiKey(geminiKey),setTempAnthKey(''),setShowKeySetup(true))} style={{padding:"9px 20px",background:"linear-gradient(135deg,#ff8c42,#e63946)",border:"none",borderRadius:9,color:"#fff",fontSize:12,fontWeight:"bold",cursor:"pointer",fontFamily:"inherit"}}>⚡ Generar copy ahora</button>
                 </div>}
                 {!loadingSEO&&(<>
                   <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(100,200,100,0.14)",borderRadius:12,padding:14,marginBottom:12}}>
