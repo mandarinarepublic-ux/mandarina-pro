@@ -1,17 +1,18 @@
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-anthropic-key');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY || process.env.VITE_ANTHROPIC_API_KEY;
-  
+  // Use key from request header (user's key) OR fall back to env var
+  const apiKey = req.headers['x-anthropic-key'] 
+    || process.env.ANTHROPIC_API_KEY 
+    || process.env.VITE_ANTHROPIC_API_KEY;
+
   if (!apiKey) {
-    return res.status(500).json({ 
-      error: 'No API key found',
-      env_keys: Object.keys(process.env).filter(k => k.includes('ANTHROPIC') || k.includes('CLAUDE')),
-      hint: 'Add ANTHROPIC_API_KEY in Vercel Environment Variables'
+    return res.status(401).json({ 
+      error: { type: 'authentication_error', message: 'No Anthropic API key provided. Add your key in the app settings (🔑).' }
     });
   }
 
@@ -28,6 +29,6 @@ export default async function handler(req, res) {
     const data = await response.json();
     return res.status(response.status).json(data);
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: { type: 'server_error', message: err.message } });
   }
 }
