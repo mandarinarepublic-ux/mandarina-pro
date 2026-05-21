@@ -586,7 +586,7 @@ export default function MandarinaPro() {
                 {/* Pipeline */}
                 <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:10,padding:12}}>
                   <div style={{fontSize:9,color:"rgba(255,255,255,0.3)",marginBottom:8}}>5 VARIANTES QUE SE GENERARÁN</div>
-                  {PROMPT_STYLES.filter(p=>selectedPrompts.includes(p.id)).map((s,i)=><div key={i} style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginBottom:4,display:"flex",gap:6}}><span style={{color:"#ff9f5a"}}>V{i+1}</span>{s.label} — <span style={{color:"rgba(255,255,255,0.25)"}}>{s.mood.substring(0,35)}...</span></div>)}
+                  {PROMPT_STYLES.filter(p=>selectedPrompts.includes(p.id)).map((s,i)=><div key={i} style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginBottom:4,display:"flex",gap:6}}><span style={{color:"#ff9f5a"}}>V{i+1}</span>{s.label} — <span style={{color:"rgba(255,255,255,0.25)"}}>{(s.desc||"").substring(0,35)}...</span></div>)}
                 </div>
               </div>
 
