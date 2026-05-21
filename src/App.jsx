@@ -180,9 +180,9 @@ Build an ENHANCED version of this prompt that:
 
 Output ONLY the prompt text, 500-700 words. No title, no explanation.` });
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("/api/claude", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1200, messages: [{ role: "user", content: parts }] })
   });
   const data = await res.json();
@@ -202,7 +202,7 @@ async function generateWithGemini(prompt, geminiKey, frontBase64, backBase64, mo
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiKey}`,
-    { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE","TEXT"], temperature: 0.35 } })
     }
   );
@@ -228,7 +228,7 @@ async function editImage(currentBase64, frontBase64, instruction, geminiKey, bac
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiKey}`,
-    { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE","TEXT"], temperature: 0.3 } })
     }
   );
@@ -240,9 +240,9 @@ async function editImage(currentBase64, frontBase64, instruction, geminiKey, bac
 }
 
 async function generateSEO(productInfo) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("/api/claude", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1500,
