@@ -1,43 +1,140 @@
 import { useState, useRef, useCallback } from "react";
 
-// ─── VARIANT SCENES — más naturales, menos IA ────────────────────────────────
-const VARIANT_SCENES = [
+// ─── 10 PROMPT STYLES ────────────────────────────────────────────────────────
+const PROMPT_STYLES = [
   {
+    id: "mirror_selfie",
     label: "Mirror Selfie",
-    scene: "real apartment bathroom or bedroom mirror, slightly messy but cozy background, natural indoor light from window, iPhone front camera with slight lens distortion",
-    pose: "casual mirror selfie, one arm raised holding phone partially covering face, slight tilt, natural weight shift",
-    mood: "authentic, unfiltered, real person not model, spontaneous social media post",
-    realism: "ULTRA realistic. Must look like a real person's actual Instagram selfie. NO studio lighting. NO perfect background. Natural skin pores, hair flyaways, real fabric wrinkles."
+    emoji: "🤳",
+    category: "Lifestyle",
+    desc: "Instagram Story 9:16, selfie espejo, lujo suave Gen Z",
+    basePrompt: `Ultra realistic cinematic fashion photography, vertical 9:16 format, captured like an authentic iPhone mirror selfie Instagram story from a premium streetwear brand campaign.
+Mirror selfie composition with iPhone partially covering face. One hand holding phone, other hand softly touching hair near ear. Relaxed effortless posture. Hoodie occupies most of frame. Focus on fit and cozy oversized silhouette.
+Warm ambient indoor lighting mixed with soft natural daylight from window. Cinematic soft shadows. Slight glow on skin. Cozy luxury atmosphere.
+Minimal modern room with beige walls, wooden textures, soft curtains, luxury hotel aesthetic, slightly blurred background.
+iPhone front camera aesthetic, realistic grain, slightly soft focus, natural skin texture, authentic Instagram story feel, not overproduced. Extremely realistic fabric folds.
+NO exaggerated AI smoothness. Cozy cinematic atmosphere. Authentic mirror selfie framing. High realism clothing texture and folds. Editorial but natural social media feeling.`
   },
   {
-    label: "Urban Street",
-    scene: "real street sidewalk, slightly busy background with pedestrians out of focus, natural overcast or golden hour daylight, shot on iPhone 15 Pro main camera",
-    pose: "walking naturally mid-stride, slight motion blur on feet, 3/4 body, looking sideways not at camera",
-    mood: "caught in motion, authentic street photography, not posed",
-    realism: "ULTRA realistic. Candid street photo feel. Background people slightly blurred. Real concrete texture, real shadows. NO artificial bokeh. Shot from slightly below eye level."
+    id: "luxury_editorial",
+    label: "Luxury Editorial",
+    emoji: "🎩",
+    category: "Editorial",
+    desc: "Vogue, sastrería de lujo, arquitectura minimalista",
+    basePrompt: `Ultra realistic high-fashion editorial photography, vertical format, captured for a luxury tailored clothing campaign in Vogue magazine.
+Three-quarter length fashion portrait, standing slightly off-center, one hand casually placed in pocket, strong geometric composition interacting with architecture.
+Dramatic studio lighting with strong rim light from upper left, creating deep Rembrandt side shadows. High contrast accentuates crisp fabric texture.
+Minimalist architect's studio with exposed raw concrete textures, industrial glass windows, and subtle metallic elements, slightly blurred.
+Shot on medium format Hasselblad H6D, 85mm lens, f/5.6 aperture, ISO 100. Pin-sharp details on fabric weave, visible textile fibers, subsurface scattering on skin, zero digital smoothing.
+Sleek, sophisticated, avant-garde luxury. Tack-sharp weave texture. No synthetic skin glow. Structured shoulder drape. High-end editorial contrast.`
   },
   {
-    label: "Hanging Product",
-    scene: "garment hanging on simple wooden or metal hanger against clean white or off-white wall, minimal shadows, flat lay adjacent or hanging cleanly",
-    pose: "product-only shot, no model, garment displayed clearly showing front design, crisp and clean",
-    mood: "clean e-commerce product shot, professional catalog style like SSENSE or Farfetch",
-    realism: "Studio product photography. Clean background. Perfect lighting showing fabric texture. Front-facing. No person."
+    id: "streetwear_flash",
+    label: "Streetwear Flash",
+    emoji: "⚡",
+    category: "Street",
+    desc: "Flash duro, muro concreto, Supreme/Balenciaga",
+    basePrompt: `Ultra realistic streetwear product campaign photography, vertical format, captured like a high-contrast flash photograph for an urban clothing line.
+Candid front-facing shot, model standing relaxed, hands loosely at the sides. Frame focuses on the chest graphic, fit, and collar thickness.
+Harsh direct flash photography, creating sharp dark shadows behind the model against the wall, overexposed highlights on the texture, high visual impact.
+Gritty industrial concrete wall with subtle texture, minor distress, and a raw street vibe, kept simple to emphasize the garment.
+Shot on 35mm prime lens, f/4.0 aperture, slight lens compression, realistic analog film grain, authentic street photography feel, organic skin pores and fabric weave visible.
+Gritty, rebellious, premium streetwear. Realistic screen-printed plastisol ink height. Direct flash shadow styling. Industrial minimalist background.`
   },
   {
-    label: "Lifestyle Coffee",
-    scene: "real coffee shop or apartment kitchen, natural morning light, wooden table or chair nearby, slightly blurred background with everyday objects",
-    pose: "standing or leaning casually, holding a coffee cup, relaxed and not looking at camera",
-    mood: "real everyday life, morning routine, aspirational but attainable",
-    realism: "ULTRA realistic. Must look like a real person's lifestyle photo, NOT an ad. Natural shadows, real environment, authentic skin and hair. Coffee cup in hand adds authenticity."
+    id: "autumn_cozy",
+    label: "Autumn Cozy",
+    emoji: "🍂",
+    category: "Lifestyle",
+    desc: "Catálogo otoño, golden hour, bokeh cremoso",
+    basePrompt: `Ultra realistic lifestyle fashion photography, vertical format, capturing a warm cozy autumn lookbook.
+Model sitting comfortably on a rustic outdoor bench, wrapped warmly. Medium close-up focusing on the texture of the knitwear and soft autumn vibe.
+Soft golden hour backlight filtering through trees, creating dappled natural window light effects, warm highlights, and gentle soft shadows.
+Softly blurred autumn park setting with golden leaves, warm earth tones, and a peaceful cozy outdoor atmosphere.
+Shot on 135mm telephoto lens, f/4.0 aperture, creating beautiful cream bokeh. Natural slightly warm color grade, organic film grain.
+Warm, nostalgic, cozy, high-end comfort and approachable luxury. Chunky texture depth. Creamy outdoor bokeh. Warm golden hour backlighting. Approachable natural expression.`
   },
   {
-    label: "Outdoor Natural",
-    scene: "real outdoor setting: park grass, building stairs, or simple urban corner, natural daylight (overcast preferred for even lighting), no tourist landmarks",
-    pose: "standing naturally, slight lean against wall or sitting on steps, relaxed body language",
-    mood: "authentic outdoor casual, everyday young person in the city",
-    realism: "ULTRA realistic. Real grass, real concrete. Natural lighting. Candid energy. NO dramatic landscapes. Real person body proportions. Fabric drapes and wrinkles naturally with gravity."
+    id: "techwear_urban",
+    label: "Techwear Night",
+    emoji: "🌆",
+    category: "Editorial",
+    desc: "Rooftop urbano, iluminación dual azul/ámbar, cyberpunk",
+    basePrompt: `Ultra realistic high-tech outerwear photography, vertical format, designed for a modern technical clothing brand campaign.
+Dynamic three-quarter angle shot, model looking directly into camera. Low-angle framing to emphasize volume and structural silhouette.
+Dramatic dual lighting: cool blue ambient twilight from one side, mixed with warm amber neon spotlight from the other, casting sharp highlights on the fabric panels.
+Urban concrete rooftop at dusk with distant city skyline lights blurred into soft circular bokeh, cyberpunk industrial aesthetic.
+Shot on 50mm lens, f/2.8 aperture, high-contrast digital sensor simulation, extremely sharp focus on fabric weave, water-droplet details on the surface, zero noise reduction.
+Futuristic, utilitarian, tech-wear aesthetic. Matte waterproof texture. High volume panels. Dual-tone blue and amber lighting. Tech-wear urban atmosphere.`
+  },
+  {
+    id: "resort_coastal",
+    label: "Resort Coastal",
+    emoji: "🌊",
+    category: "Lifestyle",
+    desc: "Costero, lino, brisa del mar, luz de mañana",
+    basePrompt: `Ultra realistic travel lifestyle photography, vertical format, captured for an ethical resort-wear clothing campaign.
+Candid shot of the model walking slowly along the coastline. The fabric is gently caught by sea breeze, showing organic movement and fluid drape.
+Bright natural morning sunlight, warm backlight filtering through fabric fibers, soft natural contrast with bright clean whites.
+Minimalist sun-bleached coastal environment with dry grass, sand dunes, and a soft desaturated ocean background, slightly out of focus.
+Shot on 85mm prime lens, f/4.0 aperture, warm natural pastel color grading, organic grain, soft focus transitions, highly detailed fabric weave imperfections.
+Airy, serene, sustainable luxury. Organic linen slub and wrinkle texture. Semi-translucent fabric drape. Wind-blown fabric movement. Desaturated coastal background.`
+  },
+  {
+    id: "activewear_botanical",
+    label: "Activewear Botanico",
+    emoji: "🌿",
+    category: "Sport",
+    desc: "Athleisure premium, estudio botánico, luz difusa",
+    basePrompt: `Ultra realistic commercial activewear photography, vertical format, designed for a premium sustainable athleisure brand catalog.
+Full body composition in a light yoga pose, interacting with a minimal wooden and mossy set. Focus on stretch, supportive fit, and smooth matte fabric texture.
+Bright clean diffused overhead studio light, simulating soft natural daylight, with soft green reflections from botanical elements.
+Modern botanical studio set featuring organic green moss panels, natural light wood blocks, and delicate wildflowers, creating premium earthy contrast.
+Shot on medium format camera, 85mm lens, f/5.6 aperture, sharp focus on ribbed microfiber textile pattern, realistic skin textures with natural sweat glow, no digital airbrushing.
+Fresh, organic, premium wellness. Ribbed microfiber matte compression fabric. Clean flatlock seam stitching. Diffused natural daylight. Botanical moss and wood studio set.`
+  },
+  {
+    id: "denim_rustic",
+    label: "Denim Rustic",
+    emoji: "☕",
+    category: "Lifestyle",
+    desc: "Documental, denim raw, café rústico, luz ventana",
+    basePrompt: `Ultra realistic documentary fashion photography, vertical format, capturing an authentic lived-in workwear style.
+Candid medium shot, model leaning casually against a wooden counter. Focus on the stiff structural drape of heavy-duty denim and authentic wear-and-tear details.
+Soft directional natural light coming from a side window, highlighting the texture of the twill and casting soft organic shadows across fabric folds.
+Sunlit rustic coffee shop or workshop with warm wooden furniture, green plants, and subtle vintage details, softly blurred.
+Shot on 35mm lens, f/5.6 aperture, warm color science, high dynamic range, organic film grain, rich indigo color tones, authentic and unretouched.
+Honest, rugged, heritage-driven. Heavy denim twill texture with natural fades. Shank metal buttons with patina. Triple-needle gold stitching. Window side-lighting.`
+  },
+  {
+    id: "bohemian_golden",
+    label: "Bohemian Golden",
+    emoji: "🌅",
+    category: "Lifestyle",
+    desc: "Maxi dress, campo lavanda, golden hour, romántico",
+    basePrompt: `Ultra realistic bohemian fashion photography, vertical format, capturing a dreamy romantic summer campaign.
+Full-length shot of the model in motion on an outdoor field. The fabric is caught mid-air, creating a beautiful silhouette of flowing movement and transparency.
+Warm low-angle golden hour sunlight, creating a beautiful halo effect on the model's hair and illuminating the translucent qualities of the fabric.
+Expansive lavender field or wild meadow at sunset, warm orange and pink sky, creating a soft romantic dreamy background.
+Shot on 135mm lens, f/4.0 aperture, slight motion blur in the flowing fabric to convey movement, warm pastel color grade, soft contrast, highly detailed fabric drape.
+Dreamy, romantic, free-spirited, elegant bohemian luxury. Flowing chiffon transparency. Wind-blown fabric movement. Golden hour sunset halo. Dreamy outdoor meadow background.`
+  },
+  {
+    id: "tuxedo_formal",
+    label: "Black Tie Formal",
+    emoji: "🥂",
+    category: "Formal",
+    desc: "Esmoquin, lounge de hotel, satin lapel, prestige",
+    basePrompt: `Ultra realistic formal wear portrait photography, vertical format, capturing high-end bespoke tailoring for a luxury fashion house.
+Three-quarter length portrait, model standing with one hand adjusting cufflink, showcasing precise tailoring of the sleeve and jacket shoulders. Elegant balanced composition.
+Low warm luxurious ambient lounge lighting, with a single soft spotlight illuminating the model's face and the satin sheen of the lapel, rich bokeh shadows.
+Sophisticated dim-lit hotel lounge with dark wood paneling, warm brass fixtures, and soft leather textures, kept out of focus.
+Shot on 85mm G-Master lens, f/4.0 aperture, compressed background, rich color saturation, deep blacks, high-fidelity textile weave, subsurface scattering on skin.
+Prestige, timeless elegance, cinematic luxury. Barathea wool and satin sheen contrast. Warm low-key ambient lighting. Bespoke tailoring catalog quality.`
   },
 ];
+
+// Default selection (first 5 for generation)
 
 // ─── APIs ─────────────────────────────────────────────────────────────────────
 async function analyzeAndBuildPrompt(frontBase64, backBase64, productInfo, userGuide, scene, modelBase64) {
@@ -58,27 +155,23 @@ async function analyzeAndBuildPrompt(frontBase64, backBase64, productInfo, userG
 Analyze both garment views carefully and build an ultra-realistic fashion photography prompt.
 
 PRODUCT: ${productInfo.name || "fashion garment"} | Color: ${productInfo.color || "see images"} | ${productInfo.description || ""}
-SCENE: ${scene.scene}
-POSE: ${scene.pose}
-MOOD: ${scene.mood}
-REALISM REQUIREMENT: ${scene.realism}
+
+BASE PHOTOGRAPHY STYLE (adapt this to the garment):
+${scene.basePrompt}
+
 STYLE GUIDE: ${userGuide || "young latinx, 20-25yo, authentic, not model-looking"}
 
-${scene.label === "Hanging Product" ? `
-THIS IS A PRODUCT-ONLY SHOT. No model. Instructions:
-- Garment hanging on hanger, clean background
-- Describe EVERY detail of the garment from BOTH views: front design, back design, all colors, all prints/graphics/text, fabric texture, cut details, labels
-- Lighting: soft even studio light, slight shadow for depth
-- Output as if writing for an e-commerce photographer
+${scene.id === "denim_rustic" || scene.label === "Hanging Product" ? `
+FOR THIS PRODUCT SHOT STYLE:
+- Describe EVERY garment detail from BOTH views: front design, back design, all colors, prints/graphics/text, fabric texture, cut details
+- Make the garment the hero of the shot
 ` : `
-Build the prompt covering:
-1. Camera & lens (specific iPhone model or DSLR, exact focal length, grain/noise level matching real photos)
-2. Model: IF a reference person photo was provided, describe that EXACT person (their precise facial features, skin tone, hair). If not, describe: age 20-25, latinx features, natural hair, natural skin, NOT model-perfect energy
-3. GARMENT - describe EVERY visible detail from BOTH front and back views: all colors, exact prints/graphics/text/logos, fabric type, fit, proportions, any details on back
-4. Pose with natural imperfections (slight tilt, natural weight, real body language)
-5. Environment (specific real details, not generic descriptions)
-6. Lighting (real natural light, no studio perfection)
-7. Critical: what makes this look REAL not AI (skin texture, fabric wrinkles, natural background imperfections)
+Build an ENHANCED version of this prompt that:
+1. Camera: use exactly what the base prompt specifies
+2. Model: ${modelBase64 ? "USE THE EXACT PERSON from the reference photo (describe their precise face, skin tone, hair, body)" : "age 20-25, latinx features, natural skin, NOT AI-perfect"}
+3. GARMENT DESCRIPTION (CRITICAL): Describe EVERY detail visible in the reference photos — exact colors, all prints/graphics/logos/text, fabric texture, fit/silhouette, any back design details. Make it so specific that the AI can recreate it exactly.
+4. Adapt the base prompt's pose, lighting and background to work with THIS specific garment
+5. Add: NO exaggerated AI smoothness. Real fabric wrinkles. Natural skin texture.
 `}
 
 Output ONLY the prompt text, 500-700 words. No title, no explanation.` });
@@ -313,6 +406,7 @@ function ShopPreview({ image, seo, price }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function MandarinaPro() {
   const [step, setStep] = useState(0);
+  const [selectedPrompts, setSelectedPrompts] = useState(PROMPT_STYLES.slice(0,5).map(p=>p.id));
   const [photoFront, setPhotoFront] = useState(null);
   const [photoBack, setPhotoBack] = useState(null);
   const [photoModel, setPhotoModel] = useState(null);
@@ -372,8 +466,9 @@ export default function MandarinaPro() {
       .finally(() => setLoadingSEO(false));
 
     const results = [];
-    for (let i = 0; i < VARIANT_SCENES.length; i++) {
-      const scene = VARIANT_SCENES[i];
+    const activeScenes = PROMPT_STYLES.filter(p => selectedPrompts.includes(p.id));
+    for (let i = 0; i < activeScenes.length; i++) {
+      const scene = activeScenes[i];
       setPromptIdx(i);
       let prompt = "";
       try {
@@ -382,7 +477,7 @@ export default function MandarinaPro() {
         prompt = r.prompt;
         addToken({type:"text", label:`Análisis ${scene.label}`, tokens:r.tokens});
       } catch(e) {
-        prompt = `Ultra realistic ${scene.mood}. Person wearing this exact garment. ${scene.scene}. ${scene.pose}. MUST look like a real photo not AI.`;
+        prompt = `Ultra realistic fashion photo. ${scene.basePrompt?.substring(0,200) || scene.label}. The person is wearing the exact garment from the reference photo. MUST look like a real photograph, not AI generated.`;
       }
       setGenIdx(i); setPromptIdx(-1);
       try {
@@ -487,7 +582,7 @@ export default function MandarinaPro() {
                 {/* Pipeline */}
                 <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:10,padding:12}}>
                   <div style={{fontSize:9,color:"rgba(255,255,255,0.3)",marginBottom:8}}>5 VARIANTES QUE SE GENERARÁN</div>
-                  {VARIANT_SCENES.map((s,i)=><div key={i} style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginBottom:4,display:"flex",gap:6}}><span style={{color:"#ff9f5a"}}>V{i+1}</span>{s.label} — <span style={{color:"rgba(255,255,255,0.25)"}}>{s.mood.substring(0,35)}...</span></div>)}
+                  {PROMPT_STYLES.filter(p=>selectedPrompts.includes(p.id)).map((s,i)=><div key={i} style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginBottom:4,display:"flex",gap:6}}><span style={{color:"#ff9f5a"}}>V{i+1}</span>{s.label} — <span style={{color:"rgba(255,255,255,0.25)"}}>{s.mood.substring(0,35)}...</span></div>)}
                 </div>
               </div>
 
@@ -522,7 +617,39 @@ export default function MandarinaPro() {
               </div>
             </div>
 
-            <button onClick={()=>{setStep(1);runAll();}} disabled={!canStart}
+            {/* PROMPT STYLE SELECTOR */}
+            <div style={{marginBottom:16,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,140,66,0.13)",borderRadius:13,padding:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                <div>
+                  <div style={{fontSize:11,color:"#ff9f5a",letterSpacing:"0.08em"}}>🎨 ESTILOS DE FOTOGRAFÍA</div>
+                  <div style={{fontSize:9,color:"rgba(255,255,255,0.25)",marginTop:2}}>Selecciona los estilos a generar (máx 5 recomendado)</div>
+                </div>
+                <div style={{fontSize:10,color:"rgba(255,140,66,0.7)"}}>
+                  {selectedPrompts.length} seleccionados
+                </div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:7}}>
+                {PROMPT_STYLES.map(p => {
+                  const selected = selectedPrompts.includes(p.id);
+                  return (
+                    <button key={p.id} onClick={()=>setSelectedPrompts(prev=>selected?prev.filter(x=>x!==p.id):[...prev,p.id])}
+                      style={{padding:"10px 6px",background:selected?"rgba(255,140,66,0.15)":"rgba(255,255,255,0.03)",border:selected?"1px solid #ff8c42":"1px solid rgba(255,255,255,0.08)",borderRadius:10,cursor:"pointer",textAlign:"center",fontFamily:"inherit",transition:"all 0.15s",position:"relative"}}>
+                      {selected && <div style={{position:"absolute",top:4,right:4,width:6,height:6,borderRadius:"50%",background:"#ff8c42"}}/>}
+                      <div style={{fontSize:18,marginBottom:4}}>{p.emoji}</div>
+                      <div style={{fontSize:9,color:selected?"#ff9f5a":"#f5f0eb",fontWeight:selected?"bold":"normal",lineHeight:1.3}}>{p.label}</div>
+                      <div style={{fontSize:8,color:"rgba(255,255,255,0.25)",marginTop:2,lineHeight:1.3}}>{p.category}</div>
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{marginTop:10,display:"flex",gap:6,flexWrap:"wrap"}}>
+                {PROMPT_STYLES.filter(p=>selectedPrompts.includes(p.id)).map(p=>(
+                  <div key={p.id} style={{background:"rgba(255,140,66,0.08)",border:"1px solid rgba(255,140,66,0.2)",borderRadius:20,padding:"3px 10px",fontSize:9,color:"rgba(255,255,255,0.5)"}}>{p.emoji} {p.desc}</div>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={()=>{setStep(1);runAll();}} disabled={!canStart||selectedPrompts.length===0}
               style={{marginTop:16,width:"100%",padding:"14px",background:canStart?"linear-gradient(135deg,#ff8c42,#e63946)":"rgba(255,255,255,0.06)",border:"none",borderRadius:11,color:canStart?"#fff":"rgba(255,255,255,0.22)",fontSize:13,fontWeight:"bold",cursor:canStart?"pointer":"not-allowed",fontFamily:"inherit",letterSpacing:"0.04em"}}>
               {!photoFront?"📸 Sube la foto delantera":!geminiKey?"🔑 Ingresa tu Gemini API Key":"🚀 Generar campaña → 5 variantes ultra-realistas"}
             </button>
@@ -534,7 +661,7 @@ export default function MandarinaPro() {
           <div style={{animation:"fadeIn 0.4s ease",textAlign:"center",paddingTop:20}}>
             <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",letterSpacing:"0.1em",marginBottom:12}}>GENERANDO TU CAMPAÑA</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,marginBottom:16}}>
-              {VARIANT_SCENES.map((s,i)=>{
+              {PROMPT_STYLES.filter(p=>selectedPrompts.includes(p.id)).map((s,i)=>{
                 const v=variants[i]; const isP=i===promptIdx; const isG=i===genIdx; const done=!!v?.dataUrl;
                 return (
                   <div key={i} style={{borderRadius:11,overflow:"hidden",border:done?"1px solid rgba(255,140,66,0.35)":"1px solid rgba(255,255,255,0.06)",background:"#0d0d0d"}}>
@@ -576,7 +703,7 @@ export default function MandarinaPro() {
               <div>
                 <div style={{fontSize:9,color:"rgba(255,255,255,0.28)",marginBottom:7,letterSpacing:"0.08em"}}>SELECCIONA LA MEJOR FOTO</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:5,marginBottom:9}}>
-                  {VARIANT_SCENES.map((s,i)=>{
+                  {PROMPT_STYLES.filter(p=>selectedPrompts.includes(p.id)).map((s,i)=>{
                     const v=variants[i];
                     return (
                       <div key={i} onClick={()=>v?.dataUrl&&setSelectedV(i)} style={{borderRadius:7,overflow:"hidden",border:selectedV===i?"2px solid #ff8c42":"2px solid rgba(255,255,255,0.06)",cursor:v?.dataUrl?"pointer":"default",aspectRatio:"1",background:"#111",position:"relative"}}>
