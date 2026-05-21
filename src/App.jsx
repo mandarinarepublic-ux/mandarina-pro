@@ -150,6 +150,10 @@ async function analyzeAndBuildPrompt(frontBase64, backBase64, productInfo, userG
     parts.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: modelBase64 } });
     parts.push({ type: "text", text: "REFERENCE MODEL PHOTO ↑ — Use this EXACT person (face, body, skin tone, hair) wearing the garment. Do NOT change their appearance." });
   }
+  const modelInstruction = modelBase64
+    ? "USE THE EXACT PERSON from the reference photo — describe their precise face, skin tone, hair color/texture, and body type so they are recognizable"
+    : "age 20-25, latinx features, natural skin tone, NOT AI-perfect, real person energy";
+
   parts.push({ type: "text", text: `You are an expert fashion photography prompt engineer. You MUST make the output look like a REAL PHOTOGRAPH, not AI-generated.
 
 Analyze both garment views carefully and build an ultra-realistic fashion photography prompt.
@@ -168,7 +172,7 @@ FOR THIS PRODUCT SHOT STYLE:
 ` : `
 Build an ENHANCED version of this prompt that:
 1. Camera: use exactly what the base prompt specifies
-2. Model: ${modelBase64 ? "USE THE EXACT PERSON from the reference photo (describe their precise face, skin tone, hair, body)" : "age 20-25, latinx features, natural skin, NOT AI-perfect"}
+2. Model: ${modelInstruction}
 3. GARMENT DESCRIPTION (CRITICAL): Describe EVERY detail visible in the reference photos — exact colors, all prints/graphics/logos/text, fabric texture, fit/silhouette, any back design details. Make it so specific that the AI can recreate it exactly.
 4. Adapt the base prompt's pose, lighting and background to work with THIS specific garment
 5. Add: NO exaggerated AI smoothness. Real fabric wrinkles. Natural skin texture.
