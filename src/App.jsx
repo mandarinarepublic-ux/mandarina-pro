@@ -313,6 +313,13 @@ JSON EXACTO:
     })
   });
   const data = await res.json();
+  // Show diagnostic if API key missing
+  if (data.error && data.hint) {
+    throw new Error("❌ " + data.error + " — " + data.hint);
+  }
+  if (data.error?.type === "authentication_error") {
+    throw new Error("❌ API key inválida. Ve a Vercel → Settings → Environment Variables y agrega ANTHROPIC_API_KEY");
+  }
   const tokens = (data.usage?.input_tokens||0)+(data.usage?.output_tokens||0);
   const text = data.content?.[0]?.text || "{}";
   try { return { result: JSON.parse(text.replace(/```json|```/g,"").trim()), tokens }; }
