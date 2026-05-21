@@ -236,14 +236,14 @@ async function generateWithGemini(prompt, geminiKey, frontBase64, backBase64, mo
   }
   if (modelBase64) {
     parts.push({ inline_data: { mime_type: "image/jpeg", data: modelBase64 } });
-    parts.push({ text: "↑ REFERENCE PERSON — use this exact person's face and body" });
+    parts.push({ text: "↑ REFERENCE PERSON — Copy ONLY this person's face, skin tone, hair, and body. IGNORE their background and current clothing entirely." });
   }
 
   // The professional prompt LAST (models follow last instruction most strongly)
   parts.push({ text: prompt });
   
   // Final mandatory reminder
-  parts.push({ text: "REMEMBER: The clothing in your generated image must be IDENTICAL to the reference garment shown above — same colors, same design, same style. This is non-negotiable." });
+  parts.push({ text: "MANDATORY: (1) GARMENT must be identical to the product reference photos — same colors, design, logo. (2) If a person reference was provided, use their face/body ONLY — generate a completely new background per the style prompt, do NOT copy their original background. (3) Final result must look like a professional fashion campaign, not a composite of reference photos." });
 
   let lastError = '';
   for (const model of GEMINI_MODELS) {
