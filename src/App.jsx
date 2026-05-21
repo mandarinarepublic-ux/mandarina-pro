@@ -173,7 +173,7 @@ FOR THIS PRODUCT SHOT STYLE:
 Build an ENHANCED version of this prompt that:
 1. Camera: use exactly what the base prompt specifies
 2. Model: ${modelInstruction}
-3. GARMENT DESCRIPTION (CRITICAL): Describe EVERY detail visible in the reference photos — exact colors, all prints/graphics/logos/text, fabric texture, fit/silhouette, any back design details. Make it so specific that the AI can recreate it exactly.
+3. GARMENT (MANDATORY - THIS IS THE MOST CRITICAL PART): The person MUST be wearing the EXACT garment from the reference photo. Describe every single detail: exact colors, all text/logos/prints/graphics visible on the garment, fabric texture, cut, fit, collar style, sleeve style, any patches or embroidery. The garment must be IDENTICAL to the reference - same colors, same design, same everything. If the model wears different clothing it is a FAILURE.
 4. Adapt the base prompt's pose, lighting and background to work with THIS specific garment
 5. Add: NO exaggerated AI smoothness. Real fabric wrinkles. Natural skin texture.
 `}
@@ -218,7 +218,7 @@ async function generateWithGemini(prompt, geminiKey, frontBase64, backBase64, mo
   if (backBase64) parts.push({ inline_data: { mime_type: "image/jpeg", data: backBase64 } });
   if (modelBase64) {
     parts.push({ inline_data: { mime_type: "image/jpeg", data: modelBase64 } });
-    parts.push({ text: "REFERENCE MODEL: dress this EXACT person in the garment shown above. Keep their face, skin tone, hair, and body 100% identical. Only change their clothing to the reference garment." });
+    parts.push({ text: "CRITICAL INSTRUCTION: The person in this photo must wear the EXACT garment shown in the first reference image. The garment colors, design, logos, prints, and style must be 100% identical to the reference product photo. Keep the model's face and identity. The garment is the hero - do NOT invent or change any clothing details." });
   }
   parts.push({ text: prompt });
 
@@ -435,11 +435,16 @@ function ShopPreview({ image, seo, price }) {
 export default function MandarinaPro() {
   const [step, setStep] = useState(0);
   const [selectedPrompts, setSelectedPrompts] = useState(PROMPT_STYLES.slice(0,5).map(p=>p.id));
+  const [savedGeminiKey, setSavedGeminiKey] = useState(() => sessionStorage.getItem('mk_g') || '');
+  const [savedAnthKey, setSavedAnthKey] = useState(() => sessionStorage.getItem('mk_a') || '');
+  const [showKeySetup, setShowKeySetup] = useState(() => !sessionStorage.getItem('mk_g'));
+  const [tempGeminiKey, setTempGeminiKey] = useState('');
+  const [tempAnthKey, setTempAnthKey] = useState('');
   const [photoFront, setPhotoFront] = useState(null);
   const [photoBack, setPhotoBack] = useState(null);
   const [photoModel, setPhotoModel] = useState(null);
-  const [geminiKey, setGeminiKey] = useState("");
-  const [keyValid, setKeyValid] = useState(null); // null=untested, true=ok, false=invalid
+  const [geminiKey, setGeminiKey] = useState(() => sessionStorage.getItem('mk_g') || "");
+  const [keyValid, setKeyValid] = useState(null);
   const [promptGuide, setPromptGuide] = useState("");
   const [productInfo, setProductInfo] = useState({ name:"", price:"", category:"Ropa", description:"", color:"" });
   const [variants, setVariants] = useState([]);
@@ -527,6 +532,15 @@ export default function MandarinaPro() {
     await seoPromise;
   };
 
+  const regenerateSEO = async () => {
+    setLoadingSEO(true);
+    try {
+      const r = await generateSEO(productInfo);
+      if (r.result) { setSeo(r.result.shopify); setIg(r.result.instagram); }
+    } catch(e) { console.error('SEO regen:', e); }
+    finally { setLoadingSEO(false); }
+  };
+
   const dl = (v, i) => {
     if (!v?.dataUrl) return;
     const a = document.createElement("a");
@@ -549,6 +563,7 @@ export default function MandarinaPro() {
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           {totalTokens>0&&<div style={{background:"rgba(255,200,50,0.07)",border:"1px solid rgba(255,200,50,0.18)",borderRadius:20,padding:"3px 11px",fontSize:10,color:"#ffd060"}}>⚡ {totalTokens.toLocaleString()} · ~${totalCost}</div>}
+          <button onClick={()=>{setTempGeminiKey(geminiKey);setShowKeySetup(true);}} style={{padding:"3px 10px",borderRadius:20,border:"1px solid rgba(255,255,255,0.08)",background:"transparent",color:"rgba(255,255,255,0.3)",fontSize:9,cursor:"pointer",fontFamily:"inherit"}}>🔑</button>
           {["📸 Foto","🤖 Generando","👁️ Revisar","✅ Publicar"].map((l,i)=>(
             <button key={i} onClick={()=>i<=step&&setStep(i)} style={{padding:"4px 9px",borderRadius:20,border:i===step?"1px solid #ff8c42":"1px solid rgba(255,255,255,0.08)",background:i===step?"rgba(255,140,66,0.14)":"transparent",color:i===step?"#ff8c42":i<step?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.18)",fontSize:10,cursor:i<=step?"pointer":"default",fontFamily:"inherit"}}>{l}</button>
           ))}
@@ -556,6 +571,39 @@ export default function MandarinaPro() {
       </header>
 
       <main style={{maxWidth:1020,margin:"0 auto",padding:"22px 18px"}}>
+        {/* ══ KEY SETUP MODAL ══ */}
+        {showKeySetup && (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",backdropFilter:"blur(8px)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+            <div style={{background:"#1a1014",border:"1px solid rgba(255,140,66,0.25)",borderRadius:20,padding:28,maxWidth:420,width:"100%"}}>
+              <div style={{textAlign:"center",marginBottom:24}}>
+                <div style={{width:48,height:48,borderRadius:"50%",background:"linear-gradient(135deg,#ff8c42,#e63946)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:"bold",margin:"0 auto 12px"}}>M</div>
+                <div style={{fontSize:20,color:"#ff9f5a",fontWeight:"bold",marginBottom:4}}>Mandarina Pro</div>
+                <div style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>Configura tus API keys una sola vez</div>
+              </div>
+
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:11,color:"#ffd060",marginBottom:6,fontWeight:"bold"}}>🔑 Gemini API Key <span style={{color:"rgba(255,200,50,0.5)",fontSize:9}}>(para generar imágenes)</span></div>
+                <input value={tempGeminiKey} onChange={e=>setTempGeminiKey(e.target.value)} placeholder="AIzaSy..." type="password"
+                  style={{width:"100%",padding:"10px 14px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,200,50,0.25)",borderRadius:10,color:"#f5f0eb",fontSize:13,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+                <div style={{fontSize:9,color:"rgba(255,255,255,0.25)",marginTop:4}}>aistudio.google.com/apikey · ~$0.04/imagen</div>
+              </div>
+
+              <button
+                onClick={()=>{
+                  if(!tempGeminiKey.trim()) return;
+                  sessionStorage.setItem('mk_g', tempGeminiKey.trim());
+                  setGeminiKey(tempGeminiKey.trim());
+                  setShowKeySetup(false);
+                }}
+                disabled={!tempGeminiKey.trim()}
+                style={{width:"100%",padding:"13px",background:tempGeminiKey.trim()?"linear-gradient(135deg,#ff8c42,#e63946)":"rgba(255,255,255,0.08)",border:"none",borderRadius:11,color:tempGeminiKey.trim()?"#fff":"rgba(255,255,255,0.3)",fontSize:14,fontWeight:"bold",cursor:tempGeminiKey.trim()?"pointer":"not-allowed",fontFamily:"inherit",marginBottom:10}}>
+                Guardar y continuar →
+              </button>
+              <div style={{textAlign:"center",fontSize:10,color:"rgba(255,255,255,0.25)"}}>Las keys se guardan en tu sesión del navegador, no en servidores</div>
+            </div>
+          </div>
+        )}
+
 
         {/* ══ STEP 0 ══ */}
         {step === 0 && (
@@ -607,7 +655,7 @@ export default function MandarinaPro() {
                 {/* API Key */}
                 <div style={{background:"rgba(66,133,244,0.06)",border:"1px solid rgba(66,133,244,0.16)",borderRadius:10,padding:12}}>
                   <div style={{fontSize:10,color:"#7ab3ff",marginBottom:6}}>🔑 Gemini API Key</div>
-                  <input value={geminiKey} onChange={e=>{ setGeminiKey(e.target.value); setKeyValid(null); }} placeholder="AIzaSy..." type="password" style={{width:"100%",padding:"7px 10px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(66,133,244,0.18)",borderRadius:7,color:"#f5f0eb",fontSize:12,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+                  <input value={geminiKey} onChange={e=>{ setGeminiKey(e.target.value); setKeyValid(null); sessionStorage.setItem("mk_g", e.target.value); }} placeholder="AIzaSy..." type="password" style={{width:"100%",padding:"7px 10px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(66,133,244,0.18)",borderRadius:7,color:"#f5f0eb",fontSize:12,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:5}}>
                   <div style={{fontSize:9,color:'rgba(255,255,255,0.18)'}}>aistudio.google.com/apikey · Modelo: gemini-2.0-flash-preview-image-generation</div>
                   {keyValid===true && <span style={{fontSize:9,color:'#7ec97e'}}>✓ Key válida</span>}
@@ -780,7 +828,10 @@ export default function MandarinaPro() {
                 {loadingSEO&&<div style={{textAlign:"center",padding:"35px",color:"#ff9f5a"}}><div style={{fontSize:26,animation:"spin 1s linear infinite",marginBottom:7}}>⚡</div><div style={{fontSize:11}}>Generando SEO con neuromarketing...</div></div>}
                 {!loadingSEO&&(<>
                   <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(100,200,100,0.14)",borderRadius:12,padding:14,marginBottom:12}}>
-                    <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:12}}><span style={{fontSize:16}}>🛍️</span><span style={{fontSize:12,fontWeight:"bold",color:"#7ec97e"}}>Shopify SEO</span></div>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                      <div style={{display:"flex",alignItems:"center",gap:7}}><span style={{fontSize:16}}>🛍️</span><span style={{fontSize:12,fontWeight:"bold",color:"#7ec97e"}}>Shopify SEO</span></div>
+                      <button onClick={()=>regenerateSEO()} disabled={loadingSEO} style={{padding:"5px 12px",background:"rgba(126,201,126,0.15)",border:"1px solid rgba(126,201,126,0.3)",borderRadius:8,color:"#7ec97e",fontSize:10,cursor:"pointer",fontFamily:"inherit"}}>{loadingSEO?"⏳ Generando...":"⚡ Generar copy"}</button>
+                    </div>
                     <EF label="TÍTULO SEO" hint="max 60" value={seo?.title} onChange={v=>setSeo(s=>({...s,title:v}))} color="#7ec97e"/>
                     <EF label="META DESCRIPCIÓN" hint="150 chars" value={seo?.metaDescription} onChange={v=>setSeo(s=>({...s,metaDescription:v}))} multi color="#7ec97e"/>
                     <EF label="H1" value={seo?.h1} onChange={v=>setSeo(s=>({...s,h1:v}))} color="#7ec97e"/>
