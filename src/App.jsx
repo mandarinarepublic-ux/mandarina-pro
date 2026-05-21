@@ -105,7 +105,7 @@ async function generateSEO(productInfo) {
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1200,
-      system: "Experto en SEO e-commerce de moda latinoamericana y community manager Instagram. Responde SOLO JSON válido sin backticks.",
+      system: "Eres experto en neuromarketing, SEO avanzado para e-commerce de moda y community manager de Instagram. Técnicas: AIDA, PAS, ganchos emocionales, FOMO sutil, storytelling. Responde SOLO JSON válido sin backticks.",
       messages: [{ role: "user", content: `Producto Mandarina Ecuador: nombre="${productInfo.name||"Prenda"}", precio=$${productInfo.price||"XX"}, color="${productInfo.color||""}", categoría="${productInfo.category||"Ropa"}", descripción="${productInfo.description||""}". Tienda: www.mandarinEc.com Quito.
 JSON: {"shopify":{"title":"SEO max 60","metaDescription":"150 chars","h1":"H1 atractivo","bodyText":"3-4 oraciones persuasivas","tags":["t1","t2","t3","t4","t5","t6"],"googleAdsHeadline":"max 30","googleAdsCTA":"CTA"},"instagram":{"caption":"caption con emojis max 220 chars SIN hashtags","hashtags":"#mandarina #mandarinaec #moda #modaecuador #ecuador #ootd #fashion #estilo #ropa #outfit #quito #streetwear","cta":"CTA corto","storyText":"story 2 líneas con emoji","reelHook":"gancho 3-5 palabras"}}` }]
     })
@@ -295,9 +295,22 @@ export default function MandarinaPro() {
   };
 
   const runAll = async () => {
-    setError(""); setVariants([]); setTokens([]);
+    setError(""); setVariants([]); setTokens([]); setSeo(null); setIg(null);
     const base64 = dataUrlToBase64(photo);
     const results = [];
+
+    // Kick off SEO in parallel immediately so it runs while images generate
+    setLoadingSEO(true);
+    const seoPromise = generateSEO(productInfo)
+      .then(r => {
+        if (r.result) {
+          setSeo(r.result.shopify);
+          setIg(r.result.instagram);
+          setTokens(prev => [...prev, { type:"text", label:"SEO + Instagram", tokens:r.tokens }]);
+        }
+      })
+      .catch(e => console.error("SEO error:", e))
+      .finally(() => setLoadingSEO(false));
 
     for (let i = 0; i < VARIANT_SCENES.length; i++) {
       const scene = VARIANT_SCENES[i];
@@ -306,7 +319,7 @@ export default function MandarinaPro() {
       try {
         const r = await analyzeAndBuildPrompt(base64, productInfo, promptGuide, scene);
         prompt = r.prompt;
-        addToken({ type:"text", label:`Análisis ${scene.label}`, tokens:r.tokens });
+        setTokens(prev => [...prev, { type:"text", label:`Análisis ${scene.label}`, tokens:r.tokens }]);
       } catch(e) {
         prompt = `Hyperrealistic fashion photo of model wearing this exact garment. ${scene.scene}. ${scene.pose}. ${scene.mood}.`;
       }
@@ -315,7 +328,7 @@ export default function MandarinaPro() {
       try {
         const r = await generateWithGemini(prompt, geminiKey, base64);
         results.push({ ...scene, dataUrl:r.dataUrl, prompt });
-        addToken({ type:"image", label:scene.label, tokens:r.tokens });
+        setTokens(prev => [...prev, { type:"image", label:scene.label, tokens:r.tokens }]);
       } catch(e) {
         setError(`${scene.label}: ${e.message}`);
         results.push({ ...scene, dataUrl:null, error:e.message, prompt });
@@ -323,20 +336,8 @@ export default function MandarinaPro() {
       setVariants([...results]);
     }
     setGenIdx(-1);
-
-    // Generate SEO + IG AFTER images
-    setLoadingSEO(true);
-    try {
-      const r = await generateSEO(productInfo);
-      if (r.result) {
-        setSeo(r.result.shopify);
-        setIg(r.result.instagram);
-        addToken({ type:"text", label:"SEO + Instagram copy", tokens:r.tokens });
-      }
-    } catch(e) { console.error(e); }
-    finally { setLoadingSEO(false); }
-
     setStep(2);
+    await seoPromise;
   };
 
   const dl = (v, i) => {
@@ -589,9 +590,11 @@ export default function MandarinaPro() {
               </div>
             </div>
 
-            <button onClick={()=>setStep(3)} style={{marginTop:16,width:"100%",padding:"13px",background:"linear-gradient(135deg,#ff8c42,#e63946)",border:"none",borderRadius:11,color:"#fff",fontSize:13,fontWeight:"bold",cursor:"pointer",fontFamily:"inherit"}}>
-              ✅ Todo aprobado — publicar →
-            </button>
+            <div style={{display:"flex",gap:10,marginTop:16}}>
+              <button onClick={()=>setStep(0)} style={{padding:"13px 20px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:11,color:"rgba(255,255,255,0.5)",fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>← Volver</button>
+              <button onClick={()=>variants.forEach((v,i)=>{if(v?.dataUrl)dl(v,i);})} style={{padding:"13px 20px",background:"rgba(255,140,66,0.1)",border:"1px solid rgba(255,140,66,0.3)",borderRadius:11,color:"#ff9f5a",fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>⬇️ Descargar todo</button>
+              <button onClick={()=>setStep(3)} style={{flex:1,padding:"13px",background:"linear-gradient(135deg,#ff8c42,#e63946)",border:"none",borderRadius:11,color:"#fff",fontSize:13,fontWeight:"bold",cursor:"pointer",fontFamily:"inherit"}}>✅ Todo aprobado — publicar →</button>
+            </div>
           </div>
         )}
 
@@ -651,7 +654,7 @@ export default function MandarinaPro() {
               <div style={{background:"rgba(255,140,66,0.05)",border:"1px solid rgba(255,140,66,0.16)",borderRadius:11,padding:18,textAlign:"center"}}>
                 <div style={{fontSize:24,marginBottom:5}}>🎉</div>
                 <div style={{fontSize:14,color:"#ff9f5a",marginBottom:12}}>¡{productInfo.name||"Producto"} publicado en Mandarina!</div>
-                <button onClick={reset} style={{padding:"9px 22px",background:"linear-gradient(135deg,#ff8c42,#e63946)",border:"none",borderRadius:9,color:"#fff",fontSize:12,fontWeight:"bold",cursor:"pointer",fontFamily:"inherit"}}>+ Publicar otro producto</button>
+                <div style={{display:"flex",gap:10,justifyContent:"center"}}><button onClick={()=>setStep(2)} style={{padding:"9px 18px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:9,color:"rgba(255,255,255,0.5)",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>← Revisar</button><button onClick={reset} style={{padding:"9px 22px",background:"linear-gradient(135deg,#ff8c42,#e63946)",border:"none",borderRadius:9,color:"#fff",fontSize:12,fontWeight:"bold",cursor:"pointer",fontFamily:"inherit"}}>+ Publicar otro producto</button></div>
               </div>
             )}
           </div>
