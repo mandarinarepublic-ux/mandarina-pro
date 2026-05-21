@@ -40,7 +40,7 @@ const VARIANT_SCENES = [
 ];
 
 // ─── APIs ─────────────────────────────────────────────────────────────────────
-async function analyzeAndBuildPrompt(frontBase64, backBase64, productInfo, userGuide, scene) {
+async function analyzeAndBuildPrompt(frontBase64, backBase64, productInfo, userGuide, scene, modelBase64) {
   const parts = [
     { type: "image", source: { type: "base64", media_type: "image/jpeg", data: frontBase64 } },
     { type: "text", text: "FRONT VIEW of the garment ↑" },
@@ -48,6 +48,10 @@ async function analyzeAndBuildPrompt(frontBase64, backBase64, productInfo, userG
   if (backBase64) {
     parts.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: backBase64 } });
     parts.push({ type: "text", text: "BACK VIEW of the garment ↑" });
+  }
+  if (modelBase64) {
+    parts.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: modelBase64 } });
+    parts.push({ type: "text", text: "REFERENCE MODEL PHOTO ↑ — Use this EXACT person (face, body, skin tone, hair) wearing the garment. Do NOT change their appearance." });
   }
   parts.push({ type: "text", text: `You are an expert fashion photography prompt engineer. You MUST make the output look like a REAL PHOTOGRAPH, not AI-generated.
 
@@ -69,7 +73,7 @@ THIS IS A PRODUCT-ONLY SHOT. No model. Instructions:
 ` : `
 Build the prompt covering:
 1. Camera & lens (specific iPhone model or DSLR, exact focal length, grain/noise level matching real photos)
-2. Model (specific: age 20-25, latinx features, natural hair, natural skin, NOT perfect-looking, real person energy)
+2. Model: IF a reference person photo was provided, describe that EXACT person (their precise facial features, skin tone, hair). If not, describe: age 20-25, latinx features, natural hair, natural skin, NOT model-perfect energy
 3. GARMENT - describe EVERY visible detail from BOTH front and back views: all colors, exact prints/graphics/text/logos, fabric type, fit, proportions, any details on back
 4. Pose with natural imperfections (slight tilt, natural weight, real body language)
 5. Environment (specific real details, not generic descriptions)
@@ -88,11 +92,15 @@ Output ONLY the prompt text, 500-700 words. No title, no explanation.` });
   return { prompt: data.content?.[0]?.text || "", tokens: (data.usage?.input_tokens||0)+(data.usage?.output_tokens||0) };
 }
 
-async function generateWithGemini(prompt, geminiKey, frontBase64, backBase64) {
+async function generateWithGemini(prompt, geminiKey, frontBase64, backBase64, modelBase64) {
   const parts = [
     { inline_data: { mime_type: "image/jpeg", data: frontBase64 } },
   ];
   if (backBase64) parts.push({ inline_data: { mime_type: "image/jpeg", data: backBase64 } });
+  if (modelBase64) {
+    parts.push({ inline_data: { mime_type: "image/jpeg", data: modelBase64 } });
+    parts.push({ text: "REFERENCE MODEL: dress this EXACT person in the garment shown above. Keep their face, skin tone, hair, and body 100% identical. Only change their clothing to the reference garment." });
+  }
   parts.push({ text: prompt });
 
   const res = await fetch(
@@ -108,12 +116,16 @@ async function generateWithGemini(prompt, geminiKey, frontBase64, backBase64) {
   throw new Error(data.error?.message || data.candidates?.[0]?.finishReason || "Error");
 }
 
-async function editImage(currentBase64, frontBase64, instruction, geminiKey, backBase64) {
+async function editImage(currentBase64, frontBase64, instruction, geminiKey, backBase64, modelBase64) {
   const parts = [
     { inline_data: { mime_type: "image/jpeg", data: frontBase64 } },
     { text: "ORIGINAL GARMENT REFERENCE (front)" },
   ];
   if (backBase64) { parts.push({ inline_data: { mime_type: "image/jpeg", data: backBase64 } }); parts.push({ text: "ORIGINAL GARMENT REFERENCE (back)" }); }
+  if (modelBase64) {
+    parts.push({ inline_data: { mime_type: "image/jpeg", data: modelBase64 } });
+    parts.push({ text: "REFERENCE MODEL ↑ — preserve this person's identity throughout the edit" });
+  }
   parts.push({ inline_data: { mime_type: "image/jpeg", data: currentBase64 } });
   parts.push({ text: `GENERATED PHOTO TO EDIT ↑\n\nEdit instruction: "${instruction}"\n\nApply ONLY this change. Keep everything else identical: same model, same pose, same lighting. Keep the garment faithful to the original reference images.` });
 
@@ -188,7 +200,7 @@ function EF({ label, value, onChange, multi=false, color="#7ec97e", hint="" }) {
 }
 
 // ─── IMAGE EDITOR CHAT ────────────────────────────────────────────────────────
-function ImageEditorChat({ variant, variantIndex, frontPhoto, backPhoto, geminiKey, onUpdate, onTokens }) {
+function ImageEditorChat({ variant, variantIndex, frontPhoto, backPhoto, modelPhoto, geminiKey, onUpdate, onTokens }) {
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
@@ -205,7 +217,8 @@ function ImageEditorChat({ variant, variantIndex, frontPhoto, backPhoto, geminiK
         dataUrlToBase64(frontPhoto),
         instruction,
         geminiKey,
-        backPhoto ? dataUrlToBase64(backPhoto) : null
+        backPhoto ? dataUrlToBase64(backPhoto) : null,
+        modelPhoto ? dataUrlToBase64(modelPhoto) : null
       );
       onUpdate(variantIndex, dataUrl);
       onTokens({ type:"image", label:`Edición: ${instruction.substring(0,25)}`, tokens });
@@ -302,6 +315,7 @@ export default function MandarinaPro() {
   const [step, setStep] = useState(0);
   const [photoFront, setPhotoFront] = useState(null);
   const [photoBack, setPhotoBack] = useState(null);
+  const [photoModel, setPhotoModel] = useState(null);
   const [geminiKey, setGeminiKey] = useState("");
   const [promptGuide, setPromptGuide] = useState("");
   const [productInfo, setProductInfo] = useState({ name:"", price:"", category:"Ropa", description:"", color:"" });
@@ -319,6 +333,7 @@ export default function MandarinaPro() {
   const [activePreview, setActivePreview] = useState("instagram");
   const frontRef = useRef();
   const backRef = useRef();
+  const modelRef = useRef();
 
   const totalTokens = tokens.reduce((a,b)=>a+b.tokens,0);
   const totalCost = tokens.reduce((a,b)=>a+b.tokens*(b.type==="image"?0.00003:0.000003),0).toFixed(4);
@@ -351,7 +366,8 @@ export default function MandarinaPro() {
       setPromptIdx(i);
       let prompt = "";
       try {
-        const r = await analyzeAndBuildPrompt(frontB64, backB64, productInfo, promptGuide, scene);
+        const modelB64 = photoModel ? dataUrlToBase64(photoModel) : null;
+        const r = await analyzeAndBuildPrompt(frontB64, backB64, productInfo, promptGuide, scene, modelB64);
         prompt = r.prompt;
         addToken({type:"text", label:`Análisis ${scene.label}`, tokens:r.tokens});
       } catch(e) {
@@ -359,7 +375,7 @@ export default function MandarinaPro() {
       }
       setGenIdx(i); setPromptIdx(-1);
       try {
-        const r = await generateWithGemini(prompt, geminiKey, frontB64, backB64);
+        const r = await generateWithGemini(prompt, geminiKey, frontB64, backB64, photoModel ? dataUrlToBase64(photoModel) : null);
         results.push({...scene, dataUrl:r.dataUrl, prompt});
         addToken({type:"image", label:scene.label, tokens:r.tokens});
       } catch(e) {
@@ -381,7 +397,7 @@ export default function MandarinaPro() {
     a.click();
   };
 
-  const reset = () => { setStep(0); setPhotoFront(null); setPhotoBack(null); setVariants([]); setSeo(null); setIg(null); setTokens([]); setError(""); setPubStatus({shopify:"",instagram:""}); setProductInfo({name:"",price:"",category:"Ropa",description:"",color:""}); setPromptGuide(""); setExpandedEditor(null); };
+  const reset = () => { setStep(0); setPhotoFront(null); setPhotoBack(null); setPhotoModel(null); setVariants([]); setSeo(null); setIg(null); setTokens([]); setError(""); setPubStatus({shopify:"",instagram:""}); setProductInfo({name:"",price:"",category:"Ropa",description:"",color:""}); setPromptGuide(""); setExpandedEditor(null); };
 
   const selImg = variants[selectedV];
   const canStart = photoFront && geminiKey;
@@ -430,6 +446,24 @@ export default function MandarinaPro() {
                     {photoBack?<img src={photoBack} style={{width:"100%",objectFit:"contain",maxHeight:160}}/>:<div style={{textAlign:"center",padding:18}}><div style={{fontSize:28,opacity:0.2,marginBottom:6}}>🔄</div><div style={{fontSize:12,color:"rgba(255,255,255,0.35)",marginBottom:2}}>Espalda de la prenda</div><div style={{fontSize:9,color:"rgba(255,255,255,0.18)"}}>Mejora la calidad del prompt</div></div>}
                   </div>
                   <input ref={backRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>readFile(e.target.files[0],setPhotoBack)}/>
+                </div>
+
+                {/* MODEL REFERENCE PHOTO */}
+                <div>
+                  <div style={{fontSize:10,color:"rgba(150,200,255,0.8)",marginBottom:6,letterSpacing:"0.08em"}}>📸 FOTO DE MODELO REFERENCIA <span style={{color:"rgba(255,255,255,0.25)"}}>opcional — virtual try-on</span></div>
+                  <div onClick={()=>modelRef.current.click()} onDrop={e=>{e.preventDefault();readFile(e.dataTransfer.files[0],setPhotoModel);}} onDragOver={e=>e.preventDefault()}
+                    style={{border:`2px dashed ${photoModel?"rgba(150,200,255,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:12,cursor:"pointer",minHeight:100,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",background:"rgba(150,200,255,0.02)",position:"relative"}}>
+                    {photoModel
+                      ? <><img src={photoModel} style={{width:"100%",objectFit:"cover",maxHeight:120}}/><div style={{position:"absolute",bottom:4,left:0,right:0,textAlign:"center",fontSize:9,color:"rgba(255,255,255,0.5)",background:"rgba(0,0,0,0.5)",padding:"3px 0"}}>✓ Modelo de referencia cargado</div></>
+                      : <div style={{textAlign:"center",padding:14}}>
+                          <div style={{fontSize:24,opacity:0.2,marginBottom:5}}>🧍</div>
+                          <div style={{fontSize:11,color:"rgba(150,200,255,0.6)",marginBottom:2}}>Sube una persona real</div>
+                          <div style={{fontSize:9,color:"rgba(255,255,255,0.2)",lineHeight:1.5}}>La IA viste a esta persona exacta<br/>con tu prenda en cada escenario</div>
+                        </div>
+                    }
+                  </div>
+                  <input ref={modelRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>readFile(e.target.files[0],setPhotoModel)}/>
+                  {photoModel && <button onClick={()=>setPhotoModel(null)} style={{marginTop:4,width:"100%",padding:"4px",background:"rgba(255,80,80,0.08)",border:"1px solid rgba(255,80,80,0.2)",borderRadius:6,color:"rgba(255,100,100,0.7)",fontSize:9,cursor:"pointer",fontFamily:"inherit"}}>✕ Quitar modelo de referencia</button>}
                 </div>
 
                 {/* API Key */}
@@ -547,7 +581,7 @@ export default function MandarinaPro() {
                 )}
 
                 {expandedEditor===selectedV&&selImg?.dataUrl&&(
-                  <ImageEditorChat variant={selImg} variantIndex={selectedV} frontPhoto={photoFront} backPhoto={photoBack} geminiKey={geminiKey} onUpdate={updateVariant} onTokens={addToken}/>
+                  <ImageEditorChat variant={selImg} variantIndex={selectedV} frontPhoto={photoFront} backPhoto={photoBack} modelPhoto={photoModel} geminiKey={geminiKey} onUpdate={updateVariant} onTokens={addToken}/>
                 )}
 
                 <div style={{display:"flex",gap:6,marginTop:9,marginBottom:9}}>
