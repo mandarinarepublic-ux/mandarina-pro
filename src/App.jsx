@@ -6,131 +6,81 @@ const PROMPT_STYLES = [
     id: "mirror_selfie",
     label: "Mirror Selfie",
     emoji: "🤳",
-    category: "Lifestyle",
-    desc: "Instagram Story 9:16, selfie espejo, lujo suave Gen Z",
-    basePrompt: `Ultra realistic cinematic fashion photography, vertical 9:16 format, captured like an authentic iPhone mirror selfie Instagram story from a premium streetwear brand campaign.
-Mirror selfie composition with iPhone partially covering face. One hand holding phone, other hand softly touching hair near ear. Relaxed effortless posture. Hoodie occupies most of frame. Focus on fit and cozy oversized silhouette.
-Warm ambient indoor lighting mixed with soft natural daylight from window. Cinematic soft shadows. Slight glow on skin. Cozy luxury atmosphere.
-Minimal modern room with beige walls, wooden textures, soft curtains, luxury hotel aesthetic, slightly blurred background.
-iPhone front camera aesthetic, realistic grain, slightly soft focus, natural skin texture, authentic Instagram story feel, not overproduced. Extremely realistic fabric folds.
-NO exaggerated AI smoothness. Cozy cinematic atmosphere. Authentic mirror selfie framing. High realism clothing texture and folds. Editorial but natural social media feeling.`
+    category: "Social",
+    desc: "Selfie espejo, cuarto o baño real",
+    basePrompt: `Authentic iPhone mirror selfie, portrait crop (shoulders to mid-torso), like a real person's Instagram story. Shot in a real bedroom or bathroom — slightly messy shelves, everyday objects in background, real indoor lighting from bulb or window. Model holds phone at chest height partially blocking face. One hand in pocket or touching hair. Relaxed, unstaged posture. Slight grain, natural skin, real fabric wrinkles. NOT a studio shot. Feels like a friend took it.`
   },
   {
-    id: "luxury_editorial",
-    label: "Luxury Editorial",
-    emoji: "🎩",
-    category: "Editorial",
-    desc: "Vogue, sastrería de lujo, arquitectura minimalista",
-    basePrompt: `Ultra realistic high-fashion editorial photography, vertical format, captured for a luxury tailored clothing campaign in Vogue magazine.
-Three-quarter length fashion portrait, standing slightly off-center, one hand casually placed in pocket, strong geometric composition interacting with architecture.
-Dramatic studio lighting with strong rim light from upper left, creating deep Rembrandt side shadows. High contrast accentuates crisp fabric texture.
-Minimalist architect's studio with exposed raw concrete textures, industrial glass windows, and subtle metallic elements, slightly blurred.
-Shot on medium format Hasselblad H6D, 85mm lens, f/5.6 aperture, ISO 100. Pin-sharp details on fabric weave, visible textile fibers, subsurface scattering on skin, zero digital smoothing.
-Sleek, sophisticated, avant-garde luxury. Tack-sharp weave texture. No synthetic skin glow. Structured shoulder drape. High-end editorial contrast.`
+    id: "friends_photo",
+    label: "Con Amigos",
+    emoji: "👥",
+    category: "Social",
+    desc: "Foto casual como con amigos, crop hombros",
+    basePrompt: `Candid photo taken by a friend, portrait crop from shoulders up or chest up. Outdoor setting: sidewalk, park bench, outside a cafe or building entrance. Natural daylight, slightly overcast or golden hour. Model laughing or looking slightly off camera with a natural relaxed smile. Background slightly blurred with real urban or park elements. Shot on iPhone, warm tones, authentic. The garment is clearly visible from shoulders to waist.`
   },
   {
-    id: "streetwear_flash",
-    label: "Streetwear Flash",
-    emoji: "⚡",
+    id: "outfit_check",
+    label: "Outfit Check",
+    emoji: "🪞",
+    category: "Social",
+    desc: "GRWM, cuarto propio, foto de arriba",
+    basePrompt: `Get-ready-with-me style photo, 3/4 crop (head to hips), taken in a real bedroom. Bed, closet, or plain wall in background. Natural window light from the side. Model standing straight looking at camera or slightly down at outfit. Relaxed confident expression. Real room, real lighting — not a studio. iPhone camera, slight soft focus, warm natural tones. Shows the full garment from neck to hip clearly.`
+  },
+  {
+    id: "street_candid",
+    label: "Street Candid",
+    emoji: "🏙️",
     category: "Street",
-    desc: "Flash duro, muro concreto, Supreme/Balenciaga",
-    basePrompt: `Ultra realistic streetwear product campaign photography, vertical format, captured like a high-contrast flash photograph for an urban clothing line.
-Candid front-facing shot, model standing relaxed, hands loosely at the sides. Frame focuses on the chest graphic, fit, and collar thickness.
-Harsh direct flash photography, creating sharp dark shadows behind the model against the wall, overexposed highlights on the texture, high visual impact.
-Gritty industrial concrete wall with subtle texture, minor distress, and a raw street vibe, kept simple to emphasize the garment.
-Shot on 35mm prime lens, f/4.0 aperture, slight lens compression, realistic analog film grain, authentic street photography feel, organic skin pores and fabric weave visible.
-Gritty, rebellious, premium streetwear. Realistic screen-printed plastisol ink height. Direct flash shadow styling. Industrial minimalist background.`
+    desc: "Calle urbana, foto de pasada, natural",
+    basePrompt: `Candid-style street photo, portrait or 3/4 crop. Model walking on a real sidewalk or standing at a street corner. Real city background: buildings, parked cars, people slightly blurred in distance. Overcast natural light or golden hour. Model not posing — mid-walk, looking at phone or glancing sideways. Shot from waist height. iPhone photo feel, real street textures, authentic not staged.`
   },
   {
-    id: "autumn_cozy",
-    label: "Autumn Cozy",
-    emoji: "🍂",
-    category: "Lifestyle",
-    desc: "Catálogo otoño, golden hour, bokeh cremoso",
-    basePrompt: `Ultra realistic lifestyle fashion photography, vertical format, capturing a warm cozy autumn lookbook.
-Model sitting comfortably on a rustic outdoor bench, wrapped warmly. Medium close-up focusing on the texture of the knitwear and soft autumn vibe.
-Soft golden hour backlight filtering through trees, creating dappled natural window light effects, warm highlights, and gentle soft shadows.
-Softly blurred autumn park setting with golden leaves, warm earth tones, and a peaceful cozy outdoor atmosphere.
-Shot on 135mm telephoto lens, f/4.0 aperture, creating beautiful cream bokeh. Natural slightly warm color grade, organic film grain.
-Warm, nostalgic, cozy, high-end comfort and approachable luxury. Chunky texture depth. Creamy outdoor bokeh. Warm golden hour backlighting. Approachable natural expression.`
-  },
-  {
-    id: "techwear_urban",
-    label: "Techwear Night",
-    emoji: "🌆",
-    category: "Editorial",
-    desc: "Rooftop urbano, iluminación dual azul/ámbar, cyberpunk",
-    basePrompt: `Ultra realistic high-tech outerwear photography, vertical format, designed for a modern technical clothing brand campaign.
-Dynamic three-quarter angle shot, model looking directly into camera. Low-angle framing to emphasize volume and structural silhouette.
-Dramatic dual lighting: cool blue ambient twilight from one side, mixed with warm amber neon spotlight from the other, casting sharp highlights on the fabric panels.
-Urban concrete rooftop at dusk with distant city skyline lights blurred into soft circular bokeh, cyberpunk industrial aesthetic.
-Shot on 50mm lens, f/2.8 aperture, high-contrast digital sensor simulation, extremely sharp focus on fabric weave, water-droplet details on the surface, zero noise reduction.
-Futuristic, utilitarian, tech-wear aesthetic. Matte waterproof texture. High volume panels. Dual-tone blue and amber lighting. Tech-wear urban atmosphere.`
-  },
-  {
-    id: "resort_coastal",
-    label: "Resort Coastal",
-    emoji: "🌊",
-    category: "Lifestyle",
-    desc: "Costero, lino, brisa del mar, luz de mañana",
-    basePrompt: `Ultra realistic travel lifestyle photography, vertical format, captured for an ethical resort-wear clothing campaign.
-Candid shot of the model walking slowly along the coastline. The fabric is gently caught by sea breeze, showing organic movement and fluid drape.
-Bright natural morning sunlight, warm backlight filtering through fabric fibers, soft natural contrast with bright clean whites.
-Minimalist sun-bleached coastal environment with dry grass, sand dunes, and a soft desaturated ocean background, slightly out of focus.
-Shot on 85mm prime lens, f/4.0 aperture, warm natural pastel color grading, organic grain, soft focus transitions, highly detailed fabric weave imperfections.
-Airy, serene, sustainable luxury. Organic linen slub and wrinkle texture. Semi-translucent fabric drape. Wind-blown fabric movement. Desaturated coastal background.`
-  },
-  {
-    id: "activewear_botanical",
-    label: "Activewear Botanico",
-    emoji: "🌿",
-    category: "Sport",
-    desc: "Athleisure premium, estudio botánico, luz difusa",
-    basePrompt: `Ultra realistic commercial activewear photography, vertical format, designed for a premium sustainable athleisure brand catalog.
-Full body composition in a light yoga pose, interacting with a minimal wooden and mossy set. Focus on stretch, supportive fit, and smooth matte fabric texture.
-Bright clean diffused overhead studio light, simulating soft natural daylight, with soft green reflections from botanical elements.
-Modern botanical studio set featuring organic green moss panels, natural light wood blocks, and delicate wildflowers, creating premium earthy contrast.
-Shot on medium format camera, 85mm lens, f/5.6 aperture, sharp focus on ribbed microfiber textile pattern, realistic skin textures with natural sweat glow, no digital airbrushing.
-Fresh, organic, premium wellness. Ribbed microfiber matte compression fabric. Clean flatlock seam stitching. Diffused natural daylight. Botanical moss and wood studio set.`
-  },
-  {
-    id: "denim_rustic",
-    label: "Denim Rustic",
+    id: "coffee_hang",
+    label: "Café Casual",
     emoji: "☕",
     category: "Lifestyle",
-    desc: "Documental, denim raw, café rústico, luz ventana",
-    basePrompt: `Ultra realistic documentary fashion photography, vertical format, capturing an authentic lived-in workwear style.
-Candid medium shot, model leaning casually against a wooden counter. Focus on the stiff structural drape of heavy-duty denim and authentic wear-and-tear details.
-Soft directional natural light coming from a side window, highlighting the texture of the twill and casting soft organic shadows across fabric folds.
-Sunlit rustic coffee shop or workshop with warm wooden furniture, green plants, and subtle vintage details, softly blurred.
-Shot on 35mm lens, f/5.6 aperture, warm color science, high dynamic range, organic film grain, rich indigo color tones, authentic and unretouched.
-Honest, rugged, heritage-driven. Heavy denim twill texture with natural fades. Shank metal buttons with patina. Triple-needle gold stitching. Window side-lighting.`
+    desc: "Dentro de café, copa en mano, media foto",
+    basePrompt: `Casual cafe photo, portrait crop (head to chest or waist). Model sitting or leaning at a cafe table or counter, holding a coffee cup. Real cafe interior: wooden tables, soft ambient lighting, blurred background with other customers or shelves. Warm indoor light. Natural casual expression, not posing. Shot from across the table like a friend took it. Shows garment clearly from shoulders to mid-torso.`
   },
   {
-    id: "bohemian_golden",
-    label: "Bohemian Golden",
-    emoji: "🌅",
+    id: "rooftop_golden",
+    label: "Rooftop Sunset",
+    emoji: "🌇",
     category: "Lifestyle",
-    desc: "Maxi dress, campo lavanda, golden hour, romántico",
-    basePrompt: `Ultra realistic bohemian fashion photography, vertical format, capturing a dreamy romantic summer campaign.
-Full-length shot of the model in motion on an outdoor field. The fabric is caught mid-air, creating a beautiful silhouette of flowing movement and transparency.
-Warm low-angle golden hour sunlight, creating a beautiful halo effect on the model's hair and illuminating the translucent qualities of the fabric.
-Expansive lavender field or wild meadow at sunset, warm orange and pink sky, creating a soft romantic dreamy background.
-Shot on 135mm lens, f/4.0 aperture, slight motion blur in the flowing fabric to convey movement, warm pastel color grade, soft contrast, highly detailed fabric drape.
-Dreamy, romantic, free-spirited, elegant bohemian luxury. Flowing chiffon transparency. Wind-blown fabric movement. Golden hour sunset halo. Dreamy outdoor meadow background.`
+    desc: "Azotea, luz dorada, foto de amigo",
+    basePrompt: `Rooftop photo during golden hour, 3/4 crop (head to hips). Model leaning on a railing or ledge, city skyline softly blurred behind. Warm orange and pink sunset light hitting the face and garment naturally. Relaxed expression, one hand in pocket. Shot by a friend from slightly below eye level. iPhone photo, warm color grade, feels like an evening hangout not a photoshoot.`
   },
   {
-    id: "tuxedo_formal",
-    label: "Black Tie Formal",
-    emoji: "🥂",
-    category: "Formal",
-    desc: "Esmoquin, lounge de hotel, satin lapel, prestige",
-    basePrompt: `Ultra realistic formal wear portrait photography, vertical format, capturing high-end bespoke tailoring for a luxury fashion house.
-Three-quarter length portrait, model standing with one hand adjusting cufflink, showcasing precise tailoring of the sleeve and jacket shoulders. Elegant balanced composition.
-Low warm luxurious ambient lounge lighting, with a single soft spotlight illuminating the model's face and the satin sheen of the lapel, rich bokeh shadows.
-Sophisticated dim-lit hotel lounge with dark wood paneling, warm brass fixtures, and soft leather textures, kept out of focus.
-Shot on 85mm G-Master lens, f/4.0 aperture, compressed background, rich color saturation, deep blacks, high-fidelity textile weave, subsurface scattering on skin.
-Prestige, timeless elegance, cinematic luxury. Barathea wool and satin sheen contrast. Warm low-key ambient lighting. Bespoke tailoring catalog quality.`
+    id: "gym_lobby",
+    label: "Post Gym",
+    emoji: "💪",
+    category: "Sport",
+    desc: "Salida del gym, foto rápida, crop hombros",
+    basePrompt: `Post-workout casual photo, portrait crop (shoulders to waist). Model in a gym lobby, parking lot outside a gym, or on a sidewalk. Real environment: gym bags, cars, or building entrance visible and blurred. Natural daylight or gym fluorescent light. Model looks relaxed, slight smile, confident energy. Not flexing — just wearing the outfit casually. Shot on iPhone by a friend. Garment clearly visible.`
+  },
+  {
+    id: "home_couch",
+    label: "En Casa",
+    emoji: "🛋️",
+    category: "Lifestyle",
+    desc: "Foto en casa, sofá o sala, muy real",
+    basePrompt: `Cozy home photo, portrait crop (shoulders to waist or 3/4). Model sitting on a couch or standing in a living room or kitchen. Real home setting: cushions, TV, plants, everyday objects softly blurred. Warm ambient indoor lighting. Very relaxed, natural expression — could be watching TV or scrolling phone. Shot casually by hand. Feels completely real and unstaged. Garment visible from neck to hip.`
+  },
+  {
+    id: "night_out",
+    label: "Night Out",
+    emoji: "🌙",
+    category: "Social",
+    desc: "Salida nocturna, luz de bar, foto con amigos",
+    basePrompt: `Night out photo, portrait crop (shoulders to chest). Inside a bar, restaurant, or club with warm dim ambient lighting. Neon or warm string lights in background, blurred. Model smiling or laughing naturally — mid-conversation energy. Slight motion, real night atmosphere. Shot on iPhone at night with natural grain and warm tones. Feels like a real social outing photo, not a photoshoot.`
+  },
+  {
+    id: "park_sunny",
+    label: "Parque Soleado",
+    emoji: "🌳",
+    category: "Lifestyle",
+    desc: "Parque, luz natural, foto relajada",
+    basePrompt: `Sunny park photo, portrait or 3/4 crop (head to hips). Model sitting on grass, a bench, or leaning against a tree. Real park: green trees, natural light filtering through leaves, soft dappled shadows. Relaxed natural expression, looking at camera or slightly away. Shot by a friend from eye level. iPhone photo, natural warm daylight, feels like a real weekend afternoon. Garment clearly visible.`
   },
 ];
 
