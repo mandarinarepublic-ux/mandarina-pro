@@ -41,29 +41,48 @@ async function callClaudeJSON(systemPrompt, userPrompt) {
   catch { return null; }
 }
 
-// Generate image via Gemini Imagen 3
-async function generateWithGemini(prompt, geminiKey) {
+// Extract base64 from dataURL
+function dataUrlToBase64(dataUrl) {
+  return dataUrl.split(",")[1];
+}
+
+// Generate image using Gemini 2.0 Flash with the real product photo as reference
+async function generateWithGemini(prompt, geminiKey, productPhotoBase64) {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${geminiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${geminiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        instances: [{ prompt }],
-        parameters: {
-          sampleCount: 1,
-          aspectRatio: "1:1",
-          safetyFilterLevel: "block_few",
-          personGeneration: "allow_adult",
+        contents: [{
+          parts: [
+            {
+              inline_data: {
+                mime_type: "image/jpeg",
+                data: productPhotoBase64,
+              }
+            },
+            {
+              text: `You are a professional fashion photographer. Using EXACTLY this garment from the photo above (same colors, same design, same patterns, same logo/graphics), generate a hyperrealistic fashion photo where: ${prompt}. 
+CRITICAL: The garment must be IDENTICAL to the one in the reference photo - same colors, same prints, same design. Do NOT invent or change the clothing. Only change the model and background.`
+            }
+          ]
+        }],
+        generationConfig: {
+          responseModalities: ["IMAGE", "TEXT"],
+          temperature: 0.4,
         },
       }),
     }
   );
   const data = await res.json();
-  if (data.predictions?.[0]?.bytesBase64Encoded) {
-    return `data:image/jpeg;base64,${data.predictions[0].bytesBase64Encoded}`;
+  // Find image part in response
+  const parts = data.candidates?.[0]?.content?.parts || [];
+  const imagePart = parts.find(p => p.inlineData?.mimeType?.startsWith("image/"));
+  if (imagePart) {
+    return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
   }
-  throw new Error(data.error?.message || "Gemini error");
+  throw new Error(data.error?.message || JSON.stringify(data).substring(0, 200));
 }
 
 function buildVariantPrompt(variantDef, productName, productDesc, productColor) {
@@ -122,7 +141,8 @@ export default function MandarinaPro() {
       const v = VARIANT_PROMPTS[i];
       const prompt = buildVariantPrompt(v, productInfo.name, productInfo.description, productInfo.color);
       try {
-        const dataUrl = await generateWithGemini(prompt, geminiKey);
+        const productBase64 = dataUrlToBase64(photo);
+        const dataUrl = await generateWithGemini(prompt, geminiKey, productBase64);
         results.push({ ...v, dataUrl, prompt });
         setVariantImages([...results]);
       } catch (err) {
