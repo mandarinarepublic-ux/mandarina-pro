@@ -140,50 +140,38 @@ Prestige, timeless elegance, cinematic luxury. Barathea wool and satin sheen con
 async function analyzeAndBuildPrompt(frontBase64, backBase64, productInfo, userGuide, scene, modelBase64) {
   const parts = [
     { type: "image", source: { type: "base64", media_type: "image/jpeg", data: frontBase64 } },
-    { type: "text", text: "FRONT VIEW of the garment ↑" },
+    { type: "text", text: "GARMENT FRONT VIEW ↑" },
   ];
   if (backBase64) {
     parts.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: backBase64 } });
-    parts.push({ type: "text", text: "BACK VIEW of the garment ↑" });
+    parts.push({ type: "text", text: "GARMENT BACK VIEW ↑" });
   }
   if (modelBase64) {
     parts.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: modelBase64 } });
-    parts.push({ type: "text", text: "REFERENCE MODEL PHOTO ↑ — Use this EXACT person (face, body, skin tone, hair) wearing the garment. Do NOT change their appearance." });
+    parts.push({ type: "text", text: "REFERENCE PERSON ↑" });
   }
-  const modelInstruction = modelBase64
-    ? "USE THE EXACT PERSON from the reference photo — describe their precise face, skin tone, hair color/texture, and body type so they are recognizable"
-    : "age 20-25, latinx features, natural skin tone, NOT AI-perfect, real person energy";
 
-  parts.push({ type: "text", text: `You are an expert fashion photography prompt engineer. You MUST make the output look like a REAL PHOTOGRAPH, not AI-generated.
+  const modelDesc = modelBase64
+    ? "the EXACT person from the reference photo (same face, skin, hair - recognizable)"
+    : `young latinx person, 20-25yo, ${userGuide || "authentic, natural look"}`;
 
-Analyze both garment views carefully and build an ultra-realistic fashion photography prompt.
+  parts.push({ type: "text", text: `Analyze the garment photo and write a SHORT fashion photography prompt (max 150 words).
 
-PRODUCT: ${productInfo.name || "fashion garment"} | Color: ${productInfo.color || "see images"} | ${productInfo.description || ""}
+The prompt MUST include:
+1. GARMENT (most important): Describe EXACTLY what you see - brand name/logo if visible, exact colors, design, fabric, cut. Use this as the main subject.
+2. MODEL: ${modelDesc}
+3. SCENE: ${scene.basePrompt.substring(0, 120)}
+4. End with: "The garment is the HERO of this photo. Exact colors and design must match the reference."
 
-BASE PHOTOGRAPHY STYLE (adapt this to the garment):
-${scene.basePrompt}
+Product name: ${productInfo.name || "fashion item"}
+Color: ${productInfo.color || ""}
 
-STYLE GUIDE: ${userGuide || "young latinx, 20-25yo, authentic, not model-looking"}
-
-${scene.id === "denim_rustic" || scene.label === "Hanging Product" ? `
-FOR THIS PRODUCT SHOT STYLE:
-- Describe EVERY garment detail from BOTH views: front design, back design, all colors, prints/graphics/text, fabric texture, cut details
-- Make the garment the hero of the shot
-` : `
-Build an ENHANCED version of this prompt that:
-1. Camera: use exactly what the base prompt specifies
-2. Model: ${modelInstruction}
-3. GARMENT (MANDATORY - THIS IS THE MOST CRITICAL PART): The person MUST be wearing the EXACT garment from the reference photo. Describe every single detail: exact colors, all text/logos/prints/graphics visible on the garment, fabric texture, cut, fit, collar style, sleeve style, any patches or embroidery. The garment must be IDENTICAL to the reference - same colors, same design, same everything. If the model wears different clothing it is a FAILURE.
-4. Adapt the base prompt's pose, lighting and background to work with THIS specific garment
-5. Add: NO exaggerated AI smoothness. Real fabric wrinkles. Natural skin texture.
-`}
-
-Output ONLY the prompt text, 500-700 words. No title, no explanation.` });
+Write ONLY the prompt, no explanation.` });
 
   const res = await fetch("/api/claude", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1200, messages: [{ role: "user", content: parts }] })
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 400, messages: [{ role: "user", content: parts }] })
   });
   const data = await res.json();
   return { prompt: data.content?.[0]?.text || "", tokens: (data.usage?.input_tokens||0)+(data.usage?.output_tokens||0) };
@@ -218,7 +206,7 @@ async function generateWithGemini(prompt, geminiKey, frontBase64, backBase64, mo
   if (backBase64) parts.push({ inline_data: { mime_type: "image/jpeg", data: backBase64 } });
   if (modelBase64) {
     parts.push({ inline_data: { mime_type: "image/jpeg", data: modelBase64 } });
-    parts.push({ text: "CRITICAL INSTRUCTION: The person in this photo must wear the EXACT garment shown in the first reference image. The garment colors, design, logos, prints, and style must be 100% identical to the reference product photo. Keep the model's face and identity. The garment is the hero - do NOT invent or change any clothing details." });
+    parts.push({ text: "WEAR THIS EXACT GARMENT from image 1. Same colors, same logo, same design. Do not change the clothing." });
   }
   parts.push({ text: prompt });
 
@@ -533,11 +521,22 @@ export default function MandarinaPro() {
   };
 
   const regenerateSEO = async () => {
+    if (!productInfo.name.trim()) { alert('Primero llena el nombre del producto'); return; }
     setLoadingSEO(true);
+    setSeo(null); setIg(null);
     try {
       const r = await generateSEO(productInfo);
-      if (r.result) { setSeo(r.result.shopify); setIg(r.result.instagram); }
-    } catch(e) { console.error('SEO regen:', e); }
+      if (r.result) {
+        setSeo(r.result.shopify);
+        setIg(r.result.instagram);
+        setTokens(prev => [...prev, { type:"text", label:"SEO regenerado", tokens:r.tokens }]);
+      } else {
+        alert('Error generando copy. Verifica que ANTHROPIC_API_KEY esté configurada en Vercel.');
+      }
+    } catch(e) {
+      console.error('SEO regen:', e);
+      alert('Error: ' + e.message);
+    }
     finally { setLoadingSEO(false); }
   };
 
