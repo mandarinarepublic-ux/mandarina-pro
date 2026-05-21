@@ -182,7 +182,7 @@ Output ONLY the prompt text, 500-700 words. No title, no explanation.` });
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
     body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1200, messages: [{ role: "user", content: parts }] })
   });
   const data = await res.json();
@@ -202,7 +202,7 @@ async function generateWithGemini(prompt, geminiKey, frontBase64, backBase64, mo
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiKey}`,
-    { method: "POST", headers: { "Content-Type": "application/json" },
+    { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
       body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE","TEXT"], temperature: 0.35 } })
     }
   );
@@ -228,7 +228,7 @@ async function editImage(currentBase64, frontBase64, instruction, geminiKey, bac
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiKey}`,
-    { method: "POST", headers: { "Content-Type": "application/json" },
+    { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
       body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE","TEXT"], temperature: 0.3 } })
     }
   );
@@ -242,7 +242,7 @@ async function editImage(currentBase64, frontBase64, instruction, geminiKey, bac
 async function generateSEO(productInfo) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1500,
@@ -466,7 +466,7 @@ export default function MandarinaPro() {
           });
         }
       })
-      .catch(e => console.error("SEO error:",e))
+      .catch(e => { console.error("SEO error:",e); setError("SEO: "+(e.message||String(e))); })
       .finally(() => setLoadingSEO(false));
 
     const results = [];
@@ -481,6 +481,7 @@ export default function MandarinaPro() {
         prompt = r.prompt;
         addToken({type:"text", label:`Análisis ${scene.label}`, tokens:r.tokens});
       } catch(e) {
+        console.error('Prompt analysis error:', e.message);
         prompt = `Ultra realistic fashion photo. ${scene.basePrompt?.substring(0,200) || scene.label}. The person is wearing the exact garment from the reference photo. MUST look like a real photograph, not AI generated.`;
       }
       setGenIdx(i); setPromptIdx(-1);
@@ -489,8 +490,10 @@ export default function MandarinaPro() {
         results.push({...scene, dataUrl:r.dataUrl, prompt});
         addToken({type:"image", label:scene.label, tokens:r.tokens});
       } catch(e) {
-        setError(`${scene.label}: ${e.message}`);
-        results.push({...scene, dataUrl:null, error:e.message, prompt});
+        const errMsg = e.message || String(e);
+        setError(scene.label + ': ' + errMsg);
+        results.push({...scene, dataUrl:null, error:errMsg, prompt});
+        console.error('Image gen error:', scene.label, errMsg);
       }
       setVariants([...results]);
     }
@@ -698,6 +701,7 @@ export default function MandarinaPro() {
         {/* ══ STEP 2 ══ */}
         {step === 2 && (
           <div style={{animation:"fadeIn 0.4s ease"}}>
+            {error && <div style={{marginBottom:12,padding:"10px 14px",background:"rgba(255,80,80,0.1)",border:"1px solid rgba(255,80,80,0.3)",borderRadius:9,fontSize:11,color:"#ff9999",lineHeight:1.5}}>⚠️ Errores: {error}</div>}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
               <div><h1 style={{fontSize:24,fontWeight:"normal",color:"#ff9f5a",marginBottom:3}}>Revisa, edita y aprueba</h1><p style={{color:"rgba(255,255,255,0.35)",fontSize:11}}>Edita textos · Ajusta imágenes por chat · Preview real · Tú decides qué se publica</p></div>
               {totalTokens>0&&<div style={{textAlign:"right",fontSize:10,color:"#ffd060"}}>⚡ {totalTokens.toLocaleString()}<br/><span style={{color:"rgba(255,255,255,0.25)"}}>~${totalCost}</span></div>}
