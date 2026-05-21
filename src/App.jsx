@@ -552,7 +552,7 @@ export default function MandarinaPro() {
   const reset = () => { setStep(0); setPhotoFront(null); setPhotoBack(null); setPhotoModel(null); setVariants([]); setSeo(null); setIg(null); setTokens([]); setError(""); setPubStatus({shopify:"",instagram:""}); setProductInfo({name:"",price:"",category:"Ropa",description:"",color:""}); setPromptGuide(""); setExpandedEditor(null); };
 
   const selImg = variants[selectedV];
-  const canStart = photoFront && geminiKey;
+  const canStart = photoFront && geminiKey && productInfo.name.trim();
 
   return (
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f0c0c 0%,#1a1014 50%,#0c0f1a 100%)",fontFamily:"'Georgia',serif",color:"#f5f0eb"}}>
@@ -675,7 +675,7 @@ export default function MandarinaPro() {
                   <div style={{fontSize:10,color:"#ff9f5a",marginBottom:12,letterSpacing:"0.08em"}}>PRODUCTO</div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
                     <div style={{gridColumn:"1/-1"}}>
-                      <label style={{fontSize:9,color:"rgba(255,255,255,0.28)",display:"block",marginBottom:3}}>NOMBRE DEL PRODUCTO</label>
+                      <label style={{fontSize:9,color:"rgba(255,255,255,0.28)",display:"block",marginBottom:3}}>NOMBRE DEL PRODUCTO <span style={{color:"#e63946"}}>*</span> <span style={{fontSize:8,color:"rgba(255,80,80,0.5)"}}>(requerido)</span></label>
                       <input value={productInfo.name} onChange={e=>setProductInfo(p=>({...p,name:e.target.value}))} placeholder="Sudadera Stitch Just Chill azul marino" style={{width:"100%",padding:"7px 10px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,140,66,0.16)",borderRadius:7,color:"#f5f0eb",fontSize:12,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
                     </div>
                     {[{k:"price",l:"PRECIO $",p:"30.00"},{k:"color",l:"COLOR",p:"azul marino"},{k:"category",l:"CATEGORÍA",p:"Sudaderas"}].map(f=>(
@@ -735,7 +735,7 @@ export default function MandarinaPro() {
 
             <button onClick={()=>{setStep(1);runAll();}} disabled={!canStart||selectedPrompts.length===0}
               style={{marginTop:16,width:"100%",padding:"14px",background:canStart?"linear-gradient(135deg,#ff8c42,#e63946)":"rgba(255,255,255,0.06)",border:"none",borderRadius:11,color:canStart?"#fff":"rgba(255,255,255,0.22)",fontSize:13,fontWeight:"bold",cursor:canStart?"pointer":"not-allowed",fontFamily:"inherit",letterSpacing:"0.04em"}}>
-              {!photoFront?"📸 Sube la foto delantera":!geminiKey?"🔑 Ingresa tu Gemini API Key":"🚀 Generar campaña → 5 variantes ultra-realistas"}
+              {!photoFront?"📸 Sube la foto delantera":!geminiKey?"🔑 Ingresa tu Gemini API Key":!productInfo.name.trim()?"✏️ Ingresa el nombre del producto":"🚀 Generar campaña → 5 variantes ultra-realistas"}
             </button>
           </div>
         )}
@@ -826,6 +826,11 @@ export default function MandarinaPro() {
 
               <div style={{maxHeight:"82vh",overflowY:"auto",paddingRight:2}}>
                 {loadingSEO&&<div style={{textAlign:"center",padding:"35px",color:"#ff9f5a"}}><div style={{fontSize:26,animation:"spin 1s linear infinite",marginBottom:7}}>⚡</div><div style={{fontSize:11}}>Generando SEO con neuromarketing...</div></div>}
+                {!loadingSEO&&!seo?.title&&<div style={{textAlign:"center",padding:"20px",background:"rgba(255,140,66,0.06)",borderRadius:12,marginBottom:12}}>
+                  <div style={{fontSize:13,color:"rgba(255,255,255,0.4)",marginBottom:8}}>Sin contenido generado aún</div>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,0.25)",marginBottom:12}}>Asegúrate de haber llenado nombre, precio y descripción del producto</div>
+                  <button onClick={()=>regenerateSEO()} style={{padding:"9px 20px",background:"linear-gradient(135deg,#ff8c42,#e63946)",border:"none",borderRadius:9,color:"#fff",fontSize:12,fontWeight:"bold",cursor:"pointer",fontFamily:"inherit"}}>⚡ Generar copy ahora</button>
+                </div>}
                 {!loadingSEO&&(<>
                   <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(100,200,100,0.14)",borderRadius:12,padding:14,marginBottom:12}}>
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
@@ -841,7 +846,10 @@ export default function MandarinaPro() {
                     <div><div style={{fontSize:9,color:"rgba(255,255,255,0.28)",marginBottom:4}}>TAGS</div><div style={{display:"flex",flexWrap:"wrap",gap:4}}>{(seo?.tags||[]).map((t,i)=><span key={i} style={{background:"rgba(126,201,126,0.08)",border:"1px solid rgba(126,201,126,0.18)",borderRadius:20,padding:"2px 7px",fontSize:9,color:"#7ec97e"}}>{t}</span>)}</div></div>
                   </div>
                   <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(200,100,200,0.14)",borderRadius:12,padding:14}}>
-                    <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:12}}><span style={{fontSize:16}}>📸</span><span style={{fontSize:12,fontWeight:"bold",color:"#c97ec9"}}>Instagram</span></div>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                      <div style={{display:"flex",alignItems:"center",gap:7}}><span style={{fontSize:16}}>📸</span><span style={{fontSize:12,fontWeight:"bold",color:"#c97ec9"}}>Instagram</span></div>
+                      <button onClick={()=>regenerateSEO()} disabled={loadingSEO} style={{padding:"5px 12px",background:"rgba(201,126,201,0.15)",border:"1px solid rgba(201,126,201,0.3)",borderRadius:8,color:"#c97ec9",fontSize:10,cursor:"pointer",fontFamily:"inherit"}}>{loadingSEO?"⏳":"⚡ Generar copy"}</button>
+                    </div>
                     <EF label="CAPTION" value={ig?.caption} onChange={v=>setIg(s=>({...s,caption:v}))} multi color="#c97ec9"/>
                     <EF label="HASHTAGS" value={ig?.hashtags} onChange={v=>setIg(s=>({...s,hashtags:v}))} multi color="#c97ec9"/>
                     <EF label="CTA" value={ig?.cta} onChange={v=>setIg(s=>({...s,cta:v}))} color="#c97ec9"/>
