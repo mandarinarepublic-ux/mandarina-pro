@@ -189,6 +189,28 @@ Output ONLY the prompt text, 500-700 words. No title, no explanation.` });
   return { prompt: data.content?.[0]?.text || "", tokens: (data.usage?.input_tokens||0)+(data.usage?.output_tokens||0) };
 }
 
+const GEMINI_MODELS = [
+  'gemini-2.0-flash-exp-image-generation',
+  'gemini-2.5-flash-image',
+  'gemini-2.5-flash-preview-05-20',
+];
+
+async function tryGeminiModel(model, parts, geminiKey) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+    { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE","TEXT"], temperature: 0.35 } })
+    }
+  );
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  const imgPart = (data.candidates?.[0]?.content?.parts || []).find(p => p.inlineData?.mimeType?.startsWith("image/"));
+  const tokens = (data.usageMetadata?.promptTokenCount||0)+(data.usageMetadata?.candidatesTokenCount||0);
+  if (imgPart) return { dataUrl: `data:${imgPart.inlineData.mimeType};base64,${imgPart.inlineData.data}`, tokens };
+  const reason = data.candidates?.[0]?.finishReason;
+  throw new Error(reason === 'PROHIBITED_CONTENT' ? 'PROHIBITED_CONTENT' : (reason || 'No image returned'));
+}
+
 async function generateWithGemini(prompt, geminiKey, frontBase64, backBase64, modelBase64) {
   const parts = [
     { inline_data: { mime_type: "image/jpeg", data: frontBase64 } },
@@ -200,17 +222,19 @@ async function generateWithGemini(prompt, geminiKey, frontBase64, backBase64, mo
   }
   parts.push({ text: prompt });
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${geminiKey}`,
-    { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE","TEXT"], temperature: 0.35 } })
+  let lastError = '';
+  for (const model of GEMINI_MODELS) {
+    try {
+      const result = await tryGeminiModel(model, parts, geminiKey);
+      console.log('Success with model:', model);
+      return result;
+    } catch(e) {
+      if (e.message === 'PROHIBITED_CONTENT') throw e; // Don't retry content issues
+      lastError = `[${model}] ${e.message}`;
+      console.warn('Model failed, trying next:', model, e.message);
     }
-  );
-  const data = await res.json();
-  const imgPart = (data.candidates?.[0]?.content?.parts || []).find(p => p.inlineData?.mimeType?.startsWith("image/"));
-  const tokens = (data.usageMetadata?.promptTokenCount||0)+(data.usageMetadata?.candidatesTokenCount||0);
-  if (imgPart) return { dataUrl: `data:${imgPart.inlineData.mimeType};base64,${imgPart.inlineData.data}`, tokens };
-  throw new Error(data.error?.message || data.candidates?.[0]?.finishReason || "Error");
+  }
+  throw new Error(lastError || 'All Gemini models failed');
 }
 
 async function editImage(currentBase64, frontBase64, instruction, geminiKey, backBase64, modelBase64) {
@@ -227,7 +251,7 @@ async function editImage(currentBase64, frontBase64, instruction, geminiKey, bac
   parts.push({ text: `GENERATED PHOTO TO EDIT ↑\n\nEdit instruction: "${instruction}"\n\nApply ONLY this change. Keep everything else identical: same model, same pose, same lighting. Keep the garment faithful to the original reference images.` });
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${geminiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=${geminiKey}`,
     { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE","TEXT"], temperature: 0.3 } })
     }
