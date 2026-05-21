@@ -49,7 +49,7 @@ function dataUrlToBase64(dataUrl) {
 // Generate image using Gemini 2.0 Flash with the real product photo as reference
 async function generateWithGemini(prompt, geminiKey, productPhotoBase64) {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${geminiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
