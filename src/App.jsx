@@ -356,8 +356,19 @@ export default function MandarinaPro() {
     // SEO en paralelo
     setLoadingSEO(true);
     const seoPromise = generateSEO(productInfo)
-      .then(r => { if(r.result){ setSeo(r.result.shopify); setIg(r.result.instagram); addToken({type:"text",label:"SEO + Instagram",tokens:r.tokens}); }})
-      .catch(e => console.error("SEO:",e))
+      .then(r => {
+        if(r.result){
+          setSeo(r.result.shopify);
+          setIg(r.result.instagram);
+          setTokens(prev => [...prev, {type:"text",label:"SEO + Instagram",tokens:r.tokens}]);
+        } else {
+          console.error("SEO result was null — retrying...");
+          return generateSEO(productInfo).then(r2 => {
+            if(r2.result){ setSeo(r2.result.shopify); setIg(r2.result.instagram); setTokens(prev => [...prev, {type:"text",label:"SEO retry",tokens:r2.tokens}]); }
+          });
+        }
+      })
+      .catch(e => console.error("SEO error:",e))
       .finally(() => setLoadingSEO(false));
 
     const results = [];
@@ -412,7 +423,7 @@ export default function MandarinaPro() {
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           {totalTokens>0&&<div style={{background:"rgba(255,200,50,0.07)",border:"1px solid rgba(255,200,50,0.18)",borderRadius:20,padding:"3px 11px",fontSize:10,color:"#ffd060"}}>⚡ {totalTokens.toLocaleString()} · ~${totalCost}</div>}
           {["📸 Foto","🤖 Generando","👁️ Revisar","✅ Publicar"].map((l,i)=>(
-            <button key={i} onClick={()=>i<step&&setStep(i)} style={{padding:"4px 9px",borderRadius:20,border:i===step?"1px solid #ff8c42":"1px solid rgba(255,255,255,0.08)",background:i===step?"rgba(255,140,66,0.14)":"transparent",color:i===step?"#ff8c42":i<step?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.18)",fontSize:10,cursor:i<step?"pointer":"default",fontFamily:"inherit"}}>{l}</button>
+            <button key={i} onClick={()=>i<=step&&setStep(i)} style={{padding:"4px 9px",borderRadius:20,border:i===step?"1px solid #ff8c42":"1px solid rgba(255,255,255,0.08)",background:i===step?"rgba(255,140,66,0.14)":"transparent",color:i===step?"#ff8c42":i<step?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.18)",fontSize:10,cursor:i<=step?"pointer":"default",fontFamily:"inherit"}}>{l}</button>
           ))}
         </div>
       </header>
@@ -542,7 +553,14 @@ export default function MandarinaPro() {
                 );
               })}
             </div>
-            {error&&<div style={{padding:"8px 14px",background:"rgba(255,80,80,0.07)",border:"1px solid rgba(255,80,80,0.18)",borderRadius:9,fontSize:11,color:"#ff8888"}}>⚠️ {error}</div>}
+            {error&&<div style={{padding:"8px 14px",background:"rgba(255,80,80,0.07)",border:"1px solid rgba(255,80,80,0.18)",borderRadius:9,fontSize:11,color:"#ff8888",marginBottom:12}}>⚠️ {error}</div>}
+            {variants.some(v=>v.dataUrl) && genIdx===-1 && (
+              <div style={{marginTop:16,textAlign:"center"}}>
+                <button onClick={()=>setStep(2)} style={{padding:"13px 40px",background:"linear-gradient(135deg,#ff8c42,#e63946)",border:"none",borderRadius:11,color:"#fff",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:"inherit"}}>
+                  Ver resultados → {variants.filter(v=>v.dataUrl).length}/5 imágenes listas
+                </button>
+              </div>
+            )}
           </div>
         )}
 
