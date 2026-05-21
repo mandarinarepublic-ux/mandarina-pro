@@ -138,43 +138,67 @@ Prestige, timeless elegance, cinematic luxury. Barathea wool and satin sheen con
 
 // ─── APIs ─────────────────────────────────────────────────────────────────────
 async function analyzeAndBuildPrompt(frontBase64, backBase64, productInfo, userGuide, scene, modelBase64) {
-  const parts = [
+  // Step 1: Claude analyzes the garment and extracts key details
+  const analysisParts = [
     { type: "image", source: { type: "base64", media_type: "image/jpeg", data: frontBase64 } },
-    { type: "text", text: "GARMENT FRONT VIEW ↑" },
+    { type: "text", text: "GARMENT FRONT ↑" },
   ];
   if (backBase64) {
-    parts.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: backBase64 } });
-    parts.push({ type: "text", text: "GARMENT BACK VIEW ↑" });
+    analysisParts.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: backBase64 } });
+    analysisParts.push({ type: "text", text: "GARMENT BACK ↑" });
   }
   if (modelBase64) {
-    parts.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: modelBase64 } });
-    parts.push({ type: "text", text: "REFERENCE PERSON ↑" });
+    analysisParts.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: modelBase64 } });
+    analysisParts.push({ type: "text", text: "REFERENCE PERSON ↑" });
   }
 
-  const modelDesc = modelBase64
-    ? "the EXACT person from the reference photo (same face, skin, hair - recognizable)"
-    : `young latinx person, 20-25yo, ${userGuide || "authentic, natural look"}`;
+  const modelInstruction = modelBase64
+    ? "USE THE EXACT PERSON from the reference photo — same face, skin tone, hair, body. They must be recognizable."
+    : `young latinx person, 20-25yo, ${userGuide || "authentic real look, not AI-perfect"}`;
 
-  parts.push({ type: "text", text: `Analyze the garment photo and write a SHORT fashion photography prompt (max 150 words).
+  analysisParts.push({ type: "text", text: `You are a professional fashion photographer and prompt engineer.
 
-The prompt MUST include:
-1. GARMENT (most important): Describe EXACTLY what you see - brand name/logo if visible, exact colors, design, fabric, cut. Use this as the main subject.
-2. MODEL: ${modelDesc}
-3. SCENE: ${scene.basePrompt.substring(0, 120)}
-4. End with: "The garment is the HERO of this photo. Exact colors and design must match the reference."
+Analyze the garment photo(s) carefully and complete this fashion photography prompt template by filling in the [BRACKETS] with ultra-specific details from what you actually see.
 
-Product name: ${productInfo.name || "fashion item"}
-Color: ${productInfo.color || ""}
+PRODUCT NAME: ${productInfo.name || "fashion garment"}
+PRODUCT COLOR: ${productInfo.color || "see image"}
+PRODUCT DESCRIPTION: ${productInfo.description || ""}
 
-Write ONLY the prompt, no explanation.` });
+BASE PROMPT TEMPLATE (keep ALL the professional language, ONLY fill the brackets):
+---
+${scene.basePrompt}
+---
+
+FILL IN THESE SPECIFICS from the garment photo:
+- [GARMENT TYPE]: exact type (hoodie, tee, jacket, etc)
+- [EXACT COLORS]: every color you see in the garment
+- [DESIGN DETAILS]: all logos, text, prints, graphics, embroidery visible
+- [FABRIC]: fabric type and texture you can see
+- [CUT/FIT]: oversized, slim, regular, etc
+- [BACK DESIGN]: anything visible on the back view
+
+MODEL: ${modelInstruction}
+
+CRITICAL RULES:
+1. Keep the FULL base prompt structure and professional language intact
+2. Add the garment specifics seamlessly into the prompt
+3. The garment description must be PRECISE enough that an AI generates EXACTLY this garment
+4. End with: "MANDATORY: The model wears EXACTLY this garment — same [exact colors], same [exact design]. No substitutions."
+5. Output ONLY the final completed prompt, no explanation, no brackets remaining.` });
 
   const res = await fetch("/api/claude", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 400, messages: [{ role: "user", content: parts }] })
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 900,
+      messages: [{ role: "user", content: analysisParts }]
+    })
   });
   const data = await res.json();
-  return { prompt: data.content?.[0]?.text || "", tokens: (data.usage?.input_tokens||0)+(data.usage?.output_tokens||0) };
+  const prompt = data.content?.[0]?.text || "";
+  const tokens = (data.usage?.input_tokens||0)+(data.usage?.output_tokens||0);
+  return { prompt, tokens };
 }
 
 const GEMINI_MODELS = [
@@ -200,15 +224,26 @@ async function tryGeminiModel(model, parts, geminiKey) {
 }
 
 async function generateWithGemini(prompt, geminiKey, frontBase64, backBase64, modelBase64) {
-  const parts = [
-    { inline_data: { mime_type: "image/jpeg", data: frontBase64 } },
-  ];
-  if (backBase64) parts.push({ inline_data: { mime_type: "image/jpeg", data: backBase64 } });
+  // Put garment photo FIRST as reference, then model, then the full professional prompt LAST
+  const parts = [];
+
+  // Reference images first
+  parts.push({ inline_data: { mime_type: "image/jpeg", data: frontBase64 } });
+  parts.push({ text: "↑ REFERENCE GARMENT (front) — recreate this EXACT clothing item" });
+  if (backBase64) {
+    parts.push({ inline_data: { mime_type: "image/jpeg", data: backBase64 } });
+    parts.push({ text: "↑ REFERENCE GARMENT (back)" });
+  }
   if (modelBase64) {
     parts.push({ inline_data: { mime_type: "image/jpeg", data: modelBase64 } });
-    parts.push({ text: "WEAR THIS EXACT GARMENT from image 1. Same colors, same logo, same design. Do not change the clothing." });
+    parts.push({ text: "↑ REFERENCE PERSON — use this exact person's face and body" });
   }
+
+  // The professional prompt LAST (models follow last instruction most strongly)
   parts.push({ text: prompt });
+  
+  // Final mandatory reminder
+  parts.push({ text: "REMEMBER: The clothing in your generated image must be IDENTICAL to the reference garment shown above — same colors, same design, same style. This is non-negotiable." });
 
   let lastError = '';
   for (const model of GEMINI_MODELS) {
