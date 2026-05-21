@@ -201,7 +201,7 @@ async function generateWithGemini(prompt, geminiKey, frontBase64, backBase64, mo
   parts.push({ text: prompt });
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${geminiKey}`,
     { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE","TEXT"], temperature: 0.35 } })
     }
@@ -227,7 +227,7 @@ async function editImage(currentBase64, frontBase64, instruction, geminiKey, bac
   parts.push({ text: `GENERATED PHOTO TO EDIT ↑\n\nEdit instruction: "${instruction}"\n\nApply ONLY this change. Keep everything else identical: same model, same pose, same lighting. Keep the garment faithful to the original reference images.` });
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${geminiKey}`,
     { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE","TEXT"], temperature: 0.3 } })
     }
@@ -415,6 +415,7 @@ export default function MandarinaPro() {
   const [photoBack, setPhotoBack] = useState(null);
   const [photoModel, setPhotoModel] = useState(null);
   const [geminiKey, setGeminiKey] = useState("");
+  const [keyValid, setKeyValid] = useState(null); // null=untested, true=ok, false=invalid
   const [promptGuide, setPromptGuide] = useState("");
   const [productInfo, setProductInfo] = useState({ name:"", price:"", category:"Ropa", description:"", color:"" });
   const [variants, setVariants] = useState([]);
@@ -582,8 +583,12 @@ export default function MandarinaPro() {
                 {/* API Key */}
                 <div style={{background:"rgba(66,133,244,0.06)",border:"1px solid rgba(66,133,244,0.16)",borderRadius:10,padding:12}}>
                   <div style={{fontSize:10,color:"#7ab3ff",marginBottom:6}}>🔑 Gemini API Key</div>
-                  <input value={geminiKey} onChange={e=>setGeminiKey(e.target.value)} placeholder="AIzaSy..." type="password" style={{width:"100%",padding:"7px 10px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(66,133,244,0.18)",borderRadius:7,color:"#f5f0eb",fontSize:12,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
-                  <div style={{fontSize:9,color:"rgba(255,255,255,0.18)",marginTop:4}}>aistudio.google.com/apikey</div>
+                  <input value={geminiKey} onChange={e=>{ setGeminiKey(e.target.value); setKeyValid(null); }} placeholder="AIzaSy..." type="password" style={{width:"100%",padding:"7px 10px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(66,133,244,0.18)",borderRadius:7,color:"#f5f0eb",fontSize:12,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:5}}>
+                  <div style={{fontSize:9,color:'rgba(255,255,255,0.18)'}}>aistudio.google.com/apikey · Modelo: gemini-2.0-flash-preview-image-generation</div>
+                  {keyValid===true && <span style={{fontSize:9,color:'#7ec97e'}}>✓ Key válida</span>}
+                  {keyValid===false && <span style={{fontSize:9,color:'#ff8888'}}>✗ Key inválida</span>}
+                </div>
                 </div>
 
                 {/* Pipeline */}
