@@ -82,6 +82,14 @@ const PROMPT_STYLES = [
     desc: "Parque, luz natural, foto relajada",
     basePrompt: `Sunny park photo, portrait or 3/4 crop (head to hips). Model sitting on grass, a bench, or leaning against a tree. Real park: green trees, natural light filtering through leaves, soft dappled shadows. Relaxed natural expression, looking at camera or slightly away. Shot by a friend from eye level. iPhone photo, natural warm daylight, feels like a real weekend afternoon. Garment clearly visible.`
   },
+  {
+    id: "custom_prompt",
+    label: "Prompt Libre",
+    emoji: "✍️",
+    category: "Custom",
+    desc: "Exactamente lo que escribas",
+    basePrompt: "__CUSTOM__"
+  },
 ];
 
 // Default selection (first 5 for generation)
@@ -427,6 +435,7 @@ export default function MandarinaPro() {
   const [anthropicKey, setAnthropicKey] = useState(() => sessionStorage.getItem('mk_a') || "");
   const [keyValid, setKeyValid] = useState(null);
   const [promptGuide, setPromptGuide] = useState("");
+  const [customPromptText, setCustomPromptText] = useState("");
   const [productInfo, setProductInfo] = useState({ name:"", price:"", category:"Ropa", description:"", color:"" });
   const [variants, setVariants] = useState([]);
   const [genIdx, setGenIdx] = useState(-1);
@@ -488,9 +497,14 @@ export default function MandarinaPro() {
       let prompt = "";
       try {
         const modelB64 = photoModel ? dataUrlToBase64(photoModel) : null;
-        const r = await analyzeAndBuildPrompt(frontB64, backB64, productInfo, promptGuide, scene, modelB64, anthropicKey);
-        prompt = r.prompt;
-        addToken({type:"text", label:`Análisis ${scene.label}`, tokens:r.tokens});
+        if (scene.id === "custom_prompt") {
+          // Prompt libre: usar exactamente lo que escribió el usuario
+          prompt = customPromptText.trim() || "Ultra realistic fashion photo showing the garment from the reference photo.";
+        } else {
+          const r = await analyzeAndBuildPrompt(frontB64, backB64, productInfo, promptGuide, scene, modelB64, anthropicKey);
+          prompt = r.prompt;
+          addToken({type:"text", label:`Análisis ${scene.label}`, tokens:r.tokens});
+        }
       } catch(e) {
         console.error('Prompt analysis error:', e.message);
         prompt = `Ultra realistic fashion photo. ${scene.basePrompt?.substring(0,200) || scene.label}. The person is wearing the exact garment from the reference photo. MUST look like a real photograph, not AI generated.`;
@@ -734,6 +748,21 @@ export default function MandarinaPro() {
                   <div key={p.id} style={{background:"rgba(255,140,66,0.08)",border:"1px solid rgba(255,140,66,0.2)",borderRadius:20,padding:"3px 10px",fontSize:9,color:"rgba(255,255,255,0.5)"}}>{p.emoji} {p.desc}</div>
                 ))}
               </div>
+
+              {/* PROMPT LIBRE — aparece solo cuando está seleccionado */}
+              {selectedPrompts.includes("custom_prompt") && (
+                <div style={{marginTop:12,padding:12,background:"rgba(255,215,0,0.04)",border:"1px solid rgba(255,215,0,0.2)",borderRadius:10}}>
+                  <div style={{fontSize:10,color:"#ffd700",marginBottom:6,fontWeight:"bold"}}>✍️ Tu prompt exacto — Gemini lo ejecutará tal cual</div>
+                  <textarea
+                    value={customPromptText}
+                    onChange={e=>setCustomPromptText(e.target.value)}
+                    placeholder={"Ejemplo: reemplaza a la persona por una fruta que esté en la playa, con gafas de sol y la prenda puesta, estilo hiperrealista, luz de atardecer..."}
+                    rows={4}
+                    style={{width:"100%",padding:"9px 11px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,215,0,0.15)",borderRadius:8,color:"#f5f0eb",fontSize:11,outline:"none",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box",lineHeight:1.6}}
+                  />
+                  <div style={{fontSize:9,color:"rgba(255,215,0,0.4)",marginTop:4}}>⚡ Claude no modifica este prompt — se envía directo a Gemini sin cambios</div>
+                </div>
+              )}
             </div>
 
             <button onClick={()=>{setStep(1);runAll();}} disabled={!canStart||selectedPrompts.length===0}
