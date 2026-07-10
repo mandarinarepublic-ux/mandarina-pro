@@ -1,18 +1,18 @@
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-anthropic-key');
+  // Same-origin app only. No wildcard CORS: sin el header Access-Control-Allow-Origin
+  // el navegador bloquea llamadas desde otros sitios, evitando que terceros abusen
+  // de este proxy. Las llamadas de la propia app son same-origin y no necesitan CORS.
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Use key from request header (user's key) OR fall back to env var
-  const apiKey = req.headers['x-anthropic-key'] 
-    || process.env.ANTHROPIC_API_KEY 
-    || process.env.VITE_ANTHROPIC_API_KEY;
+  // Siempre usamos la key que envía el usuario desde la app. Sin fallback a env var,
+  // así este proxy no guarda ningún secreto que un atacante pudiera drenar.
+  const apiKey = req.headers['x-anthropic-key'];
 
   if (!apiKey) {
-    return res.status(401).json({ 
-      error: { type: 'authentication_error', message: 'No Anthropic API key provided. Add your key in the app settings (🔑).' }
+    return res.status(401).json({
+      error: { type: 'authentication_error', message: 'Falta la Anthropic API key.' },
+      hint: 'Haz click en 🔑 en el header de la app y pega tu key sk-ant-...'
     });
   }
 

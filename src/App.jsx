@@ -146,7 +146,7 @@ CRITICAL RULES:
 
   const res = await fetch("/api/claude", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-anthropic-key": anthropicKey || "" },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 900,
@@ -481,7 +481,7 @@ export default function MandarinaPro() {
           setTokens(prev => [...prev, {type:"text",label:"SEO + Instagram",tokens:r.tokens}]);
         } else {
           console.error("SEO result was null — retrying...");
-          return generateSEO(productInfo).then(r2 => {
+          return generateSEO(productInfo, anthropicKey).then(r2 => {
             if(r2.result){ setSeo(r2.result.shopify); setIg(r2.result.instagram); setTokens(prev => [...prev, {type:"text",label:"SEO retry",tokens:r2.tokens}]); }
           });
         }
