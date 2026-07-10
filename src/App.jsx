@@ -286,6 +286,25 @@ JSON EXACTO:
 
 function dataUrlToBase64(d) { return d?.split(",")[1] || null; }
 
+async function publishToShopify(productInfo, seo, imageDataUrl) {
+  const res = await fetch("/api/shopify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      productInfo,
+      seo,
+      imageBase64: dataUrlToBase64(imageDataUrl),
+      status: "draft",
+    })
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) {
+    const detail = data.hint || (typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail || ""));
+    throw new Error((data.error || "Error publicando") + (detail ? " — " + detail : ""));
+  }
+  return data;
+}
+
 // ─── EDITABLE FIELD ───────────────────────────────────────────────────────────
 function EF({ label, value, onChange, multi=false, color="#7ec97e", hint="" }) {
   const [ed, setEd] = useState(false);
@@ -448,6 +467,8 @@ export default function MandarinaPro() {
   const [tokens, setTokens] = useState([]);
   const [error, setError] = useState("");
   const [pubStatus, setPubStatus] = useState({ shopify:"", instagram:"" });
+  const [shopifyResult, setShopifyResult] = useState(null);
+  const [shopifyError, setShopifyError] = useState("");
   const [activePreview, setActivePreview] = useState("instagram");
   const frontRef = useRef();
   const backRef = useRef();
@@ -556,7 +577,7 @@ export default function MandarinaPro() {
     a.click();
   };
 
-  const reset = () => { setStep(0); setPhotoFront(null); setPhotoBack(null); setPhotoModel(null); setVariants([]); setSeo(null); setIg(null); setTokens([]); setError(""); setPubStatus({shopify:"",instagram:""}); setProductInfo({name:"",price:"",category:"Ropa",description:"",color:""}); setPromptGuide(""); setExpandedEditor(null); };
+  const reset = () => { setStep(0); setPhotoFront(null); setPhotoBack(null); setPhotoModel(null); setVariants([]); setSeo(null); setIg(null); setTokens([]); setError(""); setPubStatus({shopify:"",instagram:""}); setShopifyResult(null); setShopifyError(""); setProductInfo({name:"",price:"",category:"Ropa",description:"",color:""}); setPromptGuide(""); setExpandedEditor(null); };
 
   const selImg = variants[selectedV];
   const canStart = photoFront && geminiKey && productInfo.name.trim();
@@ -915,10 +936,29 @@ export default function MandarinaPro() {
                   <div style={{color:"rgba(255,255,255,0.35)"}}>✓ Descripción con neuromarketing</div>
                   <div style={{color:"rgba(255,255,255,0.35)"}}>✓ Precio: ${productInfo.price||"—"}</div>
                 </div>
-                <button onClick={()=>{setPubStatus(s=>({...s,shopify:"loading"}));setTimeout(()=>setPubStatus(s=>({...s,shopify:"done"})),2200);}} disabled={pubStatus.shopify==="done"}
-                  style={{width:"100%",padding:"12px",background:pubStatus.shopify==="done"?"rgba(126,201,126,0.18)":"linear-gradient(135deg,#2d7d2d,#1a5c1a)",border:"1px solid rgba(126,201,126,0.28)",borderRadius:9,color:"#fff",fontSize:12,fontWeight:"bold",cursor:pubStatus.shopify==="done"?"default":"pointer",fontFamily:"inherit"}}>
-                  {pubStatus.shopify==="loading"?"⏳ Publicando...":pubStatus.shopify==="done"?"✅ Publicado en Shopify":"🚀 Publicar en Shopify"}
+                <button
+                  onClick={async ()=>{
+                    if(pubStatus.shopify==="done") return;
+                    if(!selImg?.dataUrl){ setShopifyError("Primero selecciona una imagen generada."); return; }
+                    setShopifyError(""); setShopifyResult(null);
+                    setPubStatus(s=>({...s,shopify:"loading"}));
+                    try {
+                      const r = await publishToShopify(productInfo, seo, selImg.dataUrl);
+                      setShopifyResult(r);
+                      setPubStatus(s=>({...s,shopify:"done"}));
+                    } catch(e) {
+                      setShopifyError(e.message);
+                      setPubStatus(s=>({...s,shopify:""}));
+                    }
+                  }}
+                  disabled={pubStatus.shopify==="loading"||pubStatus.shopify==="done"}
+                  style={{width:"100%",padding:"12px",background:pubStatus.shopify==="done"?"rgba(126,201,126,0.18)":"linear-gradient(135deg,#2d7d2d,#1a5c1a)",border:"1px solid rgba(126,201,126,0.28)",borderRadius:9,color:"#fff",fontSize:12,fontWeight:"bold",cursor:pubStatus.shopify==="done"||pubStatus.shopify==="loading"?"default":"pointer",fontFamily:"inherit"}}>
+                  {pubStatus.shopify==="loading"?"⏳ Creando producto...":pubStatus.shopify==="done"?"✅ Borrador creado en Shopify":"🚀 Crear producto en Shopify"}
                 </button>
+                {shopifyError&&<div style={{marginTop:8,padding:"8px 10px",background:"rgba(255,80,80,0.08)",border:"1px solid rgba(255,80,80,0.2)",borderRadius:8,fontSize:9,color:"#ff9999",lineHeight:1.5}}>⚠️ {shopifyError}</div>}
+                {shopifyResult&&<div style={{marginTop:8,padding:"9px 11px",background:"rgba(126,201,126,0.08)",border:"1px solid rgba(126,201,126,0.25)",borderRadius:8,fontSize:10,color:"rgba(255,255,255,0.6)",lineHeight:1.6}}>
+                  ✅ Producto creado como <strong style={{color:"#7ec97e"}}>borrador</strong>. <a href={shopifyResult.adminUrl} target="_blank" rel="noreferrer" style={{color:"#7ec97e",textDecoration:"underline"}}>Revísalo y publícalo en Shopify Admin →</a>
+                </div>}
               </div>
               <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(200,100,200,0.2)",borderRadius:14,padding:18}}>
                 <div style={{display:"flex",gap:9,marginBottom:12}}><span style={{fontSize:22}}>📸</span><div><div style={{fontSize:13,fontWeight:"bold",color:"#c97ec9"}}>Instagram</div><div style={{fontSize:9,color:"rgba(255,255,255,0.28)"}}>Feed + Stories + Reels</div></div></div>
