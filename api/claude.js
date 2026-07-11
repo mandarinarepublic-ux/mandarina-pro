@@ -1,18 +1,29 @@
+// Proxy a la API de Anthropic. La key vive SOLO en el servidor
+// (ANTHROPIC_API_KEY en Vercel) — el usuario nunca la ingresa ni la ve.
+// Guardia de mismo-origen: bloquea llamadas desde otros sitios web para que
+// no puedan drenar la key. (No frena curl directo, pero corta el abuso casual
+// desde el navegador.)
+
+function sameOriginOk(req) {
+  const origin = req.headers.origin || req.headers.referer || '';
+  if (!origin) return true; // fetch same-origin puede omitir Origin
+  try {
+    return new URL(origin).host === req.headers.host;
+  } catch {
+    return false;
+  }
+}
+
 export default async function handler(req, res) {
-  // Same-origin app only. No wildcard CORS: sin el header Access-Control-Allow-Origin
-  // el navegador bloquea llamadas desde otros sitios, evitando que terceros abusen
-  // de este proxy. Las llamadas de la propia app son same-origin y no necesitan CORS.
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (!sameOriginOk(req)) return res.status(403).json({ error: { message: 'Origen no permitido' } });
 
-  // Siempre usamos la key que envía el usuario desde la app. Sin fallback a env var,
-  // así este proxy no guarda ningún secreto que un atacante pudiera drenar.
-  const apiKey = req.headers['x-anthropic-key'];
-
+  const apiKey = process.env.ANTHROPIC_API_KEY || process.env.VITE_ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return res.status(401).json({
-      error: { type: 'authentication_error', message: 'Falta la Anthropic API key.' },
-      hint: 'Haz click en 🔑 en el header de la app y pega tu key sk-ant-...'
+    return res.status(500).json({
+      error: { type: 'authentication_error', message: 'ANTHROPIC_API_KEY no configurada en Vercel.' },
+      hint: 'Agrega ANTHROPIC_API_KEY en Vercel → Settings → Environment Variables y vuelve a desplegar.'
     });
   }
 

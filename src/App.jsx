@@ -95,7 +95,7 @@ const PROMPT_STYLES = [
 // Default selection (first 5 for generation)
 
 // ─── APIs ─────────────────────────────────────────────────────────────────────
-async function analyzeAndBuildPrompt(frontBase64, backBase64, productInfo, userGuide, scene, modelBase64, anthropicKey) {
+async function analyzeAndBuildPrompt(frontBase64, backBase64, productInfo, userGuide, scene, modelBase64) {
   // Step 1: Claude analyzes the garment and extracts key details
   const analysisParts = [
     { type: "image", source: { type: "base64", media_type: "image/jpeg", data: frontBase64 } },
@@ -146,7 +146,7 @@ CRITICAL RULES:
 
   const res = await fetch("/api/claude", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-anthropic-key": anthropicKey || "" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 900,
@@ -165,13 +165,11 @@ const GEMINI_MODELS = [
   'gemini-2.5-flash-preview-05-20',
 ];
 
-async function tryGeminiModel(model, parts, geminiKey) {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
-    { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE","TEXT"], temperature: 0.35 } })
-    }
-  );
+async function tryGeminiModel(model, parts) {
+  const res = await fetch("/api/gemini", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model, contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE","TEXT"], temperature: 0.35 } })
+  });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
   const imgPart = (data.candidates?.[0]?.content?.parts || []).find(p => p.inlineData?.mimeType?.startsWith("image/"));
@@ -181,7 +179,7 @@ async function tryGeminiModel(model, parts, geminiKey) {
   throw new Error(reason === 'PROHIBITED_CONTENT' ? 'PROHIBITED_CONTENT' : (reason || 'No image returned'));
 }
 
-async function generateWithGemini(prompt, geminiKey, frontBase64, backBase64, modelBase64) {
+async function generateWithGemini(prompt, frontBase64, backBase64, modelBase64) {
   // Put garment photo FIRST as reference, then model, then the full professional prompt LAST
   const parts = [];
 
@@ -206,7 +204,7 @@ async function generateWithGemini(prompt, geminiKey, frontBase64, backBase64, mo
   let lastError = '';
   for (const model of GEMINI_MODELS) {
     try {
-      const result = await tryGeminiModel(model, parts, geminiKey);
+      const result = await tryGeminiModel(model, parts);
       console.log('Success with model:', model);
       return result;
     } catch(e) {
@@ -218,7 +216,7 @@ async function generateWithGemini(prompt, geminiKey, frontBase64, backBase64, mo
   throw new Error(lastError || 'All Gemini models failed');
 }
 
-async function editImage(currentBase64, frontBase64, instruction, geminiKey, backBase64, modelBase64) {
+async function editImage(currentBase64, frontBase64, instruction, backBase64, modelBase64) {
   const parts = [
     { inline_data: { mime_type: "image/jpeg", data: frontBase64 } },
     { text: "ORIGINAL GARMENT REFERENCE (front)" },
@@ -231,12 +229,10 @@ async function editImage(currentBase64, frontBase64, instruction, geminiKey, bac
   parts.push({ inline_data: { mime_type: "image/jpeg", data: currentBase64 } });
   parts.push({ text: `GENERATED PHOTO TO EDIT ↑\n\nEdit instruction: "${instruction}"\n\nApply ONLY this change. Keep everything else identical: same model, same pose, same lighting. Keep the garment faithful to the original reference images.` });
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=${geminiKey}`,
-    { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE","TEXT"], temperature: 0.3 } })
-    }
-  );
+  const res = await fetch("/api/gemini", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "gemini-2.0-flash-exp-image-generation", contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE","TEXT"], temperature: 0.3 } })
+  });
   const data = await res.json();
   const imgPart = (data.candidates?.[0]?.content?.parts || []).find(p => p.inlineData?.mimeType?.startsWith("image/"));
   const tokens = (data.usageMetadata?.promptTokenCount||0)+(data.usageMetadata?.candidatesTokenCount||0);
@@ -244,10 +240,10 @@ async function editImage(currentBase64, frontBase64, instruction, geminiKey, bac
   throw new Error(data.error?.message || "Error editando");
 }
 
-async function generateSEO(productInfo, anthropicKey) {
+async function generateSEO(productInfo) {
   const res = await fetch("/api/claude", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-anthropic-key": anthropicKey },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1500,
@@ -328,7 +324,7 @@ function EF({ label, value, onChange, multi=false, color="#7ec97e", hint="" }) {
 }
 
 // ─── IMAGE EDITOR CHAT ────────────────────────────────────────────────────────
-function ImageEditorChat({ variant, variantIndex, frontPhoto, backPhoto, modelPhoto, geminiKey, onUpdate, onTokens }) {
+function ImageEditorChat({ variant, variantIndex, frontPhoto, backPhoto, modelPhoto, onUpdate, onTokens }) {
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
@@ -344,7 +340,6 @@ function ImageEditorChat({ variant, variantIndex, frontPhoto, backPhoto, modelPh
         dataUrlToBase64(variant.dataUrl),
         dataUrlToBase64(frontPhoto),
         instruction,
-        geminiKey,
         backPhoto ? dataUrlToBase64(backPhoto) : null,
         modelPhoto ? dataUrlToBase64(modelPhoto) : null
       );
@@ -442,17 +437,9 @@ function ShopPreview({ image, seo, price }) {
 export default function MandarinaPro() {
   const [step, setStep] = useState(0);
   const [selectedPrompts, setSelectedPrompts] = useState(PROMPT_STYLES.slice(0,5).map(p=>p.id));
-  const [savedGeminiKey, setSavedGeminiKey] = useState(() => sessionStorage.getItem('mk_g') || '');
-  const [savedAnthKey, setSavedAnthKey] = useState(() => sessionStorage.getItem('mk_a') || '');
-  const [showKeySetup, setShowKeySetup] = useState(() => !sessionStorage.getItem('mk_g'));
-  const [tempGeminiKey, setTempGeminiKey] = useState('');
-  const [tempAnthKey, setTempAnthKey] = useState('');
   const [photoFront, setPhotoFront] = useState(null);
   const [photoBack, setPhotoBack] = useState(null);
   const [photoModel, setPhotoModel] = useState(null);
-  const [geminiKey, setGeminiKey] = useState(() => sessionStorage.getItem('mk_g') || "");
-  const [anthropicKey, setAnthropicKey] = useState(() => sessionStorage.getItem('mk_a') || "");
-  const [keyValid, setKeyValid] = useState(null);
   const [promptGuide, setPromptGuide] = useState("");
   const [customPromptText, setCustomPromptText] = useState("");
   const [productInfo, setProductInfo] = useState({ name:"", price:"", category:"Ropa", description:"", color:"" });
@@ -494,7 +481,7 @@ export default function MandarinaPro() {
 
     // SEO en paralelo
     setLoadingSEO(true);
-    const seoPromise = generateSEO(productInfo, anthropicKey)
+    const seoPromise = generateSEO(productInfo)
       .then(r => {
         if(r.result){
           setSeo(r.result.shopify);
@@ -502,7 +489,7 @@ export default function MandarinaPro() {
           setTokens(prev => [...prev, {type:"text",label:"SEO + Instagram",tokens:r.tokens}]);
         } else {
           console.error("SEO result was null — retrying...");
-          return generateSEO(productInfo, anthropicKey).then(r2 => {
+          return generateSEO(productInfo).then(r2 => {
             if(r2.result){ setSeo(r2.result.shopify); setIg(r2.result.instagram); setTokens(prev => [...prev, {type:"text",label:"SEO retry",tokens:r2.tokens}]); }
           });
         }
@@ -522,7 +509,7 @@ export default function MandarinaPro() {
           // Prompt libre: usar exactamente lo que escribió el usuario
           prompt = customPromptText.trim() || "Ultra realistic fashion photo showing the garment from the reference photo.";
         } else {
-          const r = await analyzeAndBuildPrompt(frontB64, backB64, productInfo, promptGuide, scene, modelB64, anthropicKey);
+          const r = await analyzeAndBuildPrompt(frontB64, backB64, productInfo, promptGuide, scene, modelB64);
           prompt = r.prompt;
           addToken({type:"text", label:`Análisis ${scene.label}`, tokens:r.tokens});
         }
@@ -532,7 +519,7 @@ export default function MandarinaPro() {
       }
       setGenIdx(i); setPromptIdx(-1);
       try {
-        const r = await generateWithGemini(prompt, geminiKey, frontB64, backB64, photoModel ? dataUrlToBase64(photoModel) : null);
+        const r = await generateWithGemini(prompt, frontB64, backB64, photoModel ? dataUrlToBase64(photoModel) : null);
         results.push({...scene, dataUrl:r.dataUrl, prompt});
         addToken({type:"image", label:scene.label, tokens:r.tokens});
       } catch(e) {
@@ -550,17 +537,16 @@ export default function MandarinaPro() {
 
   const regenerateSEO = async () => {
     if (!productInfo.name.trim()) { alert('Primero llena el nombre del producto'); return; }
-    if (!anthropicKey) { alert('Necesitas agregar tu Anthropic API Key. Haz click en 🔑 en el header.'); setTempGeminiKey(geminiKey); setTempAnthKey(''); setShowKeySetup(true); return; }
     setLoadingSEO(true);
     setSeo(null); setIg(null);
     try {
-      const r = await generateSEO(productInfo, anthropicKey);
+      const r = await generateSEO(productInfo);
       if (r.result) {
         setSeo(r.result.shopify);
         setIg(r.result.instagram);
         setTokens(prev => [...prev, { type:"text", label:"SEO regenerado", tokens:r.tokens }]);
       } else {
-        alert('Error generando copy. Verifica tu Anthropic API Key haciendo click en 🔑');
+        alert('Error generando copy. Intenta de nuevo.');
       }
     } catch(e) {
       console.error('SEO regen:', e);
@@ -580,7 +566,7 @@ export default function MandarinaPro() {
   const reset = () => { setStep(0); setPhotoFront(null); setPhotoBack(null); setPhotoModel(null); setVariants([]); setSeo(null); setIg(null); setTokens([]); setError(""); setPubStatus({shopify:"",instagram:""}); setShopifyResult(null); setShopifyError(""); setProductInfo({name:"",price:"",category:"Ropa",description:"",color:""}); setPromptGuide(""); setExpandedEditor(null); };
 
   const selImg = variants[selectedV];
-  const canStart = photoFront && geminiKey && productInfo.name.trim();
+  const canStart = photoFront && productInfo.name.trim();
 
   return (
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f0c0c 0%,#1a1014 50%,#0c0f1a 100%)",fontFamily:"'Georgia',serif",color:"#f5f0eb"}}>
@@ -591,7 +577,6 @@ export default function MandarinaPro() {
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           {totalTokens>0&&<div style={{background:"rgba(255,200,50,0.07)",border:"1px solid rgba(255,200,50,0.18)",borderRadius:20,padding:"3px 11px",fontSize:10,color:"#ffd060"}}>⚡ {totalTokens.toLocaleString()} · ~${totalCost}</div>}
-          <button onClick={()=>{setTempGeminiKey(geminiKey);setShowKeySetup(true);}} style={{padding:"3px 10px",borderRadius:20,border:"1px solid rgba(255,255,255,0.08)",background:"transparent",color:"rgba(255,255,255,0.3)",fontSize:9,cursor:"pointer",fontFamily:"inherit"}}>🔑</button>
           {["📸 Foto","🤖 Generando","👁️ Revisar","✅ Publicar"].map((l,i)=>(
             <button key={i} onClick={()=>i<=step&&setStep(i)} style={{padding:"4px 9px",borderRadius:20,border:i===step?"1px solid #ff8c42":"1px solid rgba(255,255,255,0.08)",background:i===step?"rgba(255,140,66,0.14)":"transparent",color:i===step?"#ff8c42":i<step?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.18)",fontSize:10,cursor:i<=step?"pointer":"default",fontFamily:"inherit"}}>{l}</button>
           ))}
@@ -599,50 +584,6 @@ export default function MandarinaPro() {
       </header>
 
       <main style={{maxWidth:1020,margin:"0 auto",padding:"22px 18px"}}>
-        {/* ══ KEY SETUP MODAL ══ */}
-        {showKeySetup && (
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",backdropFilter:"blur(8px)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-            <div style={{background:"#1a1014",border:"1px solid rgba(255,140,66,0.25)",borderRadius:20,padding:28,maxWidth:420,width:"100%"}}>
-              <div style={{textAlign:"center",marginBottom:24}}>
-                <div style={{width:48,height:48,borderRadius:"50%",background:"linear-gradient(135deg,#ff8c42,#e63946)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:"bold",margin:"0 auto 12px"}}>M</div>
-                <div style={{fontSize:20,color:"#ff9f5a",fontWeight:"bold",marginBottom:4}}>Mandarina Pro</div>
-                <div style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>Configura tus API keys una sola vez</div>
-              </div>
-
-              <div style={{marginBottom:14}}>
-                <div style={{fontSize:11,color:"#ffd060",marginBottom:6,fontWeight:"bold"}}>🖼️ Gemini API Key <span style={{color:"rgba(255,200,50,0.5)",fontSize:9}}>(para generar imágenes)</span></div>
-                <input value={tempGeminiKey} onChange={e=>setTempGeminiKey(e.target.value)} placeholder="AIzaSy..." type="password"
-                  style={{width:"100%",padding:"10px 14px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,200,50,0.25)",borderRadius:10,color:"#f5f0eb",fontSize:13,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
-                <div style={{fontSize:9,color:"rgba(255,255,255,0.25)",marginTop:4}}>aistudio.google.com/apikey · ~$0.04/imagen</div>
-              </div>
-              <div style={{marginBottom:16}}>
-                <div style={{fontSize:11,color:"#ff9f5a",marginBottom:6,fontWeight:"bold"}}>🤖 Anthropic API Key <span style={{color:"rgba(255,140,66,0.5)",fontSize:9}}>(para SEO y copy)</span></div>
-                <input value={tempAnthKey} onChange={e=>setTempAnthKey(e.target.value)} placeholder="sk-ant-api03-..." type="password"
-                  style={{width:"100%",padding:"10px 14px",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,140,66,0.25)",borderRadius:10,color:"#f5f0eb",fontSize:13,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
-                <div style={{fontSize:9,color:"rgba(255,255,255,0.25)",marginTop:4}}>console.anthropic.com/settings/keys · Para SEO, copy e Instagram</div>
-              </div>
-
-              <button
-                onClick={()=>{
-                  if(!tempGeminiKey.trim()) return;
-                  sessionStorage.setItem('mk_g', tempGeminiKey.trim());
-                  setGeminiKey(tempGeminiKey.trim());
-                  if(tempAnthKey.trim()) {
-                    sessionStorage.setItem('mk_a', tempAnthKey.trim());
-                    setAnthropicKey(tempAnthKey.trim());
-                  }
-                  setShowKeySetup(false);
-                }}
-                disabled={!tempGeminiKey.trim()}
-                style={{width:"100%",padding:"13px",background:tempGeminiKey.trim()?"linear-gradient(135deg,#ff8c42,#e63946)":"rgba(255,255,255,0.08)",border:"none",borderRadius:11,color:tempGeminiKey.trim()?"#fff":"rgba(255,255,255,0.3)",fontSize:14,fontWeight:"bold",cursor:tempGeminiKey.trim()?"pointer":"not-allowed",fontFamily:"inherit",marginBottom:10}}>
-                Guardar keys y continuar →
-              </button>
-              <div style={{textAlign:"center",fontSize:10,color:"rgba(255,255,255,0.25)"}}>Las keys se guardan en tu sesión del navegador, no en servidores</div>
-            </div>
-          </div>
-        )}
-
-
         {/* ══ STEP 0 ══ */}
         {step === 0 && (
           <div style={{animation:"fadeIn 0.4s ease"}}>
@@ -688,17 +629,6 @@ export default function MandarinaPro() {
                   </div>
                   <input ref={modelRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>readFile(e.target.files[0],setPhotoModel)}/>
                   {photoModel && <button onClick={()=>setPhotoModel(null)} style={{marginTop:4,width:"100%",padding:"4px",background:"rgba(255,80,80,0.08)",border:"1px solid rgba(255,80,80,0.2)",borderRadius:6,color:"rgba(255,100,100,0.7)",fontSize:9,cursor:"pointer",fontFamily:"inherit"}}>✕ Quitar modelo de referencia</button>}
-                </div>
-
-                {/* API Key */}
-                <div style={{background:"rgba(66,133,244,0.06)",border:"1px solid rgba(66,133,244,0.16)",borderRadius:10,padding:12}}>
-                  <div style={{fontSize:10,color:"#7ab3ff",marginBottom:6}}>🔑 Gemini API Key</div>
-                  <input value={geminiKey} onChange={e=>{ setGeminiKey(e.target.value); setKeyValid(null); sessionStorage.setItem("mk_g", e.target.value); }} placeholder="AIzaSy..." type="password" style={{width:"100%",padding:"7px 10px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(66,133,244,0.18)",borderRadius:7,color:"#f5f0eb",fontSize:12,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:5}}>
-                  <div style={{fontSize:9,color:'rgba(255,255,255,0.18)'}}>aistudio.google.com/apikey · Modelo: gemini-2.0-flash-preview-image-generation</div>
-                  {keyValid===true && <span style={{fontSize:9,color:'#7ec97e'}}>✓ Key válida</span>}
-                  {keyValid===false && <span style={{fontSize:9,color:'#ff8888'}}>✗ Key inválida</span>}
-                </div>
                 </div>
 
                 {/* Pipeline */}
@@ -788,7 +718,7 @@ export default function MandarinaPro() {
 
             <button onClick={()=>{setStep(1);runAll();}} disabled={!canStart||selectedPrompts.length===0}
               style={{marginTop:16,width:"100%",padding:"14px",background:canStart?"linear-gradient(135deg,#ff8c42,#e63946)":"rgba(255,255,255,0.06)",border:"none",borderRadius:11,color:canStart?"#fff":"rgba(255,255,255,0.22)",fontSize:13,fontWeight:"bold",cursor:canStart?"pointer":"not-allowed",fontFamily:"inherit",letterSpacing:"0.04em"}}>
-              {!photoFront?"📸 Sube la foto delantera":!geminiKey?"🔑 Ingresa tu Gemini API Key":!productInfo.name.trim()?"✏️ Ingresa el nombre del producto":"🚀 Generar campaña → 5 variantes ultra-realistas"}
+              {!photoFront?"📸 Sube la foto delantera":!productInfo.name.trim()?"✏️ Ingresa el nombre del producto":"🚀 Generar campaña → variantes ultra-realistas"}
             </button>
           </div>
         )}
@@ -864,7 +794,7 @@ export default function MandarinaPro() {
                 )}
 
                 {expandedEditor===selectedV&&selImg?.dataUrl&&(
-                  <ImageEditorChat variant={selImg} variantIndex={selectedV} frontPhoto={photoFront} backPhoto={photoBack} modelPhoto={photoModel} geminiKey={geminiKey} onUpdate={updateVariant} onTokens={addToken}/>
+                  <ImageEditorChat variant={selImg} variantIndex={selectedV} frontPhoto={photoFront} backPhoto={photoBack} modelPhoto={photoModel} onUpdate={updateVariant} onTokens={addToken}/>
                 )}
 
                 <div style={{display:"flex",gap:6,marginTop:9,marginBottom:9}}>
@@ -882,7 +812,7 @@ export default function MandarinaPro() {
                 {!loadingSEO&&!seo?.title&&<div style={{textAlign:"center",padding:"20px",background:"rgba(255,140,66,0.06)",borderRadius:12,marginBottom:12}}>
                   <div style={{fontSize:13,color:"rgba(255,255,255,0.4)",marginBottom:8}}>Sin contenido generado aún</div>
                   <div style={{fontSize:11,color:"rgba(255,255,255,0.25)",marginBottom:12}}>Asegúrate de haber llenado nombre, precio y descripción del producto</div>
-                  <button onClick={()=>anthropicKey?regenerateSEO():(setTempGeminiKey(geminiKey),setTempAnthKey(''),setShowKeySetup(true))} style={{padding:"9px 20px",background:"linear-gradient(135deg,#ff8c42,#e63946)",border:"none",borderRadius:9,color:"#fff",fontSize:12,fontWeight:"bold",cursor:"pointer",fontFamily:"inherit"}}>⚡ Generar copy ahora</button>
+                  <button onClick={()=>regenerateSEO()} style={{padding:"9px 20px",background:"linear-gradient(135deg,#ff8c42,#e63946)",border:"none",borderRadius:9,color:"#fff",fontSize:12,fontWeight:"bold",cursor:"pointer",fontFamily:"inherit"}}>⚡ Generar copy ahora</button>
                 </div>}
                 {!loadingSEO&&(<>
                   <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(100,200,100,0.14)",borderRadius:12,padding:14,marginBottom:12}}>
