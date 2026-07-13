@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 // ─── 10 PROMPT STYLES ────────────────────────────────────────────────────────
 const PROMPT_STYLES = [
@@ -433,6 +433,61 @@ function ShopPreview({ image, seo, price }) {
   );
 }
 
+// ─── LOGIN GATE ─────────────────────────────────────────────────────────────
+function LoginScreen({ onOk }) {
+  const [user, setUser] = useState("");
+  const [pass, setPass] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const submit = async () => {
+    if (loading || !user.trim() || !pass) return;
+    setErr(""); setLoading(true);
+    try {
+      const r = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: user.trim(), password: pass }) });
+      const d = await r.json();
+      if (r.ok && d.ok) onOk();
+      else setErr(d.error || "No autorizado");
+    } catch { setErr("Error de red. Intenta de nuevo."); }
+    setLoading(false);
+  };
+  const inputStyle = { width: "100%", padding: "11px 13px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,140,66,0.2)", borderRadius: 9, color: "#f5f0eb", fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box", marginBottom: 10 };
+  return (
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg,#0f0c0c 0%,#1a1014 50%,#0c0f1a 100%)", fontFamily: "'Georgia',serif", color: "#f5f0eb", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ width: "100%", maxWidth: 340, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,140,66,0.15)", borderRadius: 18, padding: 28, textAlign: "center" }}>
+        <div style={{ width: 46, height: 46, borderRadius: "50%", background: "linear-gradient(135deg,#ff8c42,#e63946)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: "bold", margin: "0 auto 14px" }}>M</div>
+        <div style={{ fontSize: 18, fontWeight: "bold", color: "#ff9f5a", letterSpacing: "0.05em" }}>MANDARINA PRO</div>
+        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.14em", marginBottom: 22 }}>AI FASHION STUDIO</div>
+        <input value={user} onChange={e => setUser(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} placeholder="Usuario" autoFocus style={inputStyle} />
+        <input value={pass} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} placeholder="Clave" type="password" style={inputStyle} />
+        {err && <div style={{ fontSize: 11, color: "#ff8888", marginBottom: 10 }}>⚠️ {err}</div>}
+        <button onClick={submit} disabled={loading || !user.trim() || !pass} style={{ width: "100%", padding: "12px", background: (!loading && user.trim() && pass) ? "linear-gradient(135deg,#ff8c42,#e63946)" : "rgba(255,255,255,0.06)", border: "none", borderRadius: 10, color: (!loading && user.trim() && pass) ? "#fff" : "rgba(255,255,255,0.25)", fontSize: 14, fontWeight: "bold", cursor: (!loading && user.trim() && pass) ? "pointer" : "not-allowed", fontFamily: "inherit", letterSpacing: "0.04em" }}>{loading ? "⏳ Entrando..." : "Entrar"}</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── INDICADOR DE ESTADO DE CONFIGURACIÓN ─────────────────────────────────────
+function HealthBadge({ health }) {
+  if (!health) return null;
+  const items = [
+    { k: "anthropic", l: "Claude" },
+    { k: "gemini", l: "Gemini" },
+    { k: "shopify", l: "Shopify" },
+  ];
+  const allOk = items.every(it => health[it.k]);
+  return (
+    <div title={allOk ? "Todas las integraciones configuradas en Vercel" : "Falta configurar alguna key en Vercel → Settings → Environment Variables"}
+      style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.03)", border: `1px solid ${allOk ? "rgba(126,201,126,0.25)" : "rgba(255,200,80,0.3)"}`, borderRadius: 20, padding: "4px 11px", fontSize: 9 }}>
+      {items.map(it => (
+        <span key={it.k} style={{ display: "flex", alignItems: "center", gap: 4, color: health[it.k] ? "rgba(255,255,255,0.5)" : "rgba(255,150,80,0.9)" }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: health[it.k] ? "#7ec97e" : "#ffae42", display: "inline-block" }} />
+          {it.l}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function MandarinaPro() {
   const [step, setStep] = useState(0);
@@ -457,9 +512,41 @@ export default function MandarinaPro() {
   const [shopifyResult, setShopifyResult] = useState(null);
   const [shopifyError, setShopifyError] = useState("");
   const [activePreview, setActivePreview] = useState("instagram");
+  const [authed, setAuthed] = useState(null); // null=verificando, false=login, true=ok
+  const [health, setHealth] = useState(null);
+  const [draftLoaded, setDraftLoaded] = useState(false);
   const frontRef = useRef();
   const backRef = useRef();
   const modelRef = useRef();
+
+  // Sesión + estado de configuración al cargar.
+  useEffect(() => {
+    fetch("/api/session").then(r => setAuthed(r.ok)).catch(() => setAuthed(true));
+    fetch("/api/health").then(r => r.json()).then(setHealth).catch(() => {});
+  }, []);
+
+  // Cargar borrador guardado (solo texto; las fotos no se persisten).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("mp_draft");
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d.productInfo) setProductInfo(p => ({ ...p, ...d.productInfo }));
+        if (typeof d.promptGuide === "string") setPromptGuide(d.promptGuide);
+        if (typeof d.customPromptText === "string") setCustomPromptText(d.customPromptText);
+        if (Array.isArray(d.selectedPrompts) && d.selectedPrompts.length) setSelectedPrompts(d.selectedPrompts);
+      }
+    } catch { /* ignora borrador corrupto */ }
+    setDraftLoaded(true);
+  }, []);
+
+  // Guardar borrador cuando cambian los campos (tras la carga inicial).
+  useEffect(() => {
+    if (!draftLoaded) return;
+    try {
+      localStorage.setItem("mp_draft", JSON.stringify({ productInfo, promptGuide, customPromptText, selectedPrompts }));
+    } catch { /* cuota llena: no bloquea */ }
+  }, [draftLoaded, productInfo, promptGuide, customPromptText, selectedPrompts]);
 
   const totalTokens = tokens.reduce((a,b)=>a+b.tokens,0);
   const totalCost = tokens.reduce((a,b)=>a+b.tokens*(b.type==="image"?0.00003:0.000003),0).toFixed(4);
@@ -555,6 +642,35 @@ export default function MandarinaPro() {
     finally { setLoadingSEO(false); }
   };
 
+  // Regenera UNA sola variante (re-analiza + genera), sin rehacer las otras.
+  const regenerateVariant = async (i) => {
+    const activeScenes = PROMPT_STYLES.filter(p => selectedPrompts.includes(p.id));
+    const scene = activeScenes[i];
+    if (!scene || !photoFront) return;
+    const frontB64 = dataUrlToBase64(photoFront);
+    const backB64 = photoBack ? dataUrlToBase64(photoBack) : null;
+    const modelB64 = photoModel ? dataUrlToBase64(photoModel) : null;
+    setError("");
+    setVariants(prev => prev.map((v, idx) => idx === i ? { ...(v || scene), dataUrl: null, error: null, regenerating: true } : v));
+    try {
+      let prompt;
+      if (scene.id === "custom_prompt") {
+        prompt = customPromptText.trim() || "Ultra realistic fashion photo showing the garment from the reference photo.";
+      } else {
+        const r = await analyzeAndBuildPrompt(frontB64, backB64, productInfo, promptGuide, scene, modelB64);
+        prompt = r.prompt;
+        addToken({ type: "text", label: `Re-análisis ${scene.label}`, tokens: r.tokens });
+      }
+      const g = await generateWithGemini(prompt, frontB64, backB64, modelB64);
+      setVariants(prev => prev.map((v, idx) => idx === i ? { ...scene, dataUrl: g.dataUrl, prompt, regenerating: false } : v));
+      addToken({ type: "image", label: `Regen ${scene.label}`, tokens: g.tokens });
+    } catch (e) {
+      const msg = e.message || String(e);
+      setError(scene.label + ': ' + msg);
+      setVariants(prev => prev.map((v, idx) => idx === i ? { ...(v || scene), dataUrl: null, error: msg, regenerating: false } : v));
+    }
+  };
+
   const dl = (v, i) => {
     if (!v?.dataUrl) return;
     const a = document.createElement("a");
@@ -568,6 +684,14 @@ export default function MandarinaPro() {
   const selImg = variants[selectedV];
   const canStart = photoFront && productInfo.name.trim();
 
+  // ── Candado de acceso ──
+  if (authed === null) {
+    return <div style={{ minHeight: "100vh", background: "linear-gradient(135deg,#0f0c0c 0%,#1a1014 50%,#0c0f1a 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "#ff9f5a", fontFamily: "'Georgia',serif", fontSize: 22 }}><span style={{ animation: "spin 1s linear infinite" }}>⚡</span></div>;
+  }
+  if (authed === false) {
+    return <LoginScreen onOk={() => setAuthed(true)} />;
+  }
+
   return (
     <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0f0c0c 0%,#1a1014 50%,#0c0f1a 100%)",fontFamily:"'Georgia',serif",color:"#f5f0eb"}}>
       <header style={{padding:"13px 22px",borderBottom:"1px solid rgba(255,165,80,0.1)",display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(0,0,0,0.4)",backdropFilter:"blur(20px)",position:"sticky",top:0,zIndex:100}}>
@@ -576,6 +700,7 @@ export default function MandarinaPro() {
           <div><div style={{fontSize:14,fontWeight:"bold",letterSpacing:"0.05em",color:"#ff9f5a"}}>MANDARINA PRO</div><div style={{fontSize:8,color:"rgba(255,255,255,0.25)",letterSpacing:"0.12em"}}>AI FASHION STUDIO</div></div>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <HealthBadge health={health} />
           {totalTokens>0&&<div style={{background:"rgba(255,200,50,0.07)",border:"1px solid rgba(255,200,50,0.18)",borderRadius:20,padding:"3px 11px",fontSize:10,color:"#ffd060"}}>⚡ {totalTokens.toLocaleString()} · ~${totalCost}</div>}
           {["📸 Foto","🤖 Generando","👁️ Revisar","✅ Publicar"].map((l,i)=>(
             <button key={i} onClick={()=>i<=step&&setStep(i)} style={{padding:"4px 9px",borderRadius:20,border:i===step?"1px solid #ff8c42":"1px solid rgba(255,255,255,0.08)",background:i===step?"rgba(255,140,66,0.14)":"transparent",color:i===step?"#ff8c42":i<step?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.18)",fontSize:10,cursor:i<=step?"pointer":"default",fontFamily:"inherit"}}>{l}</button>
@@ -727,6 +852,21 @@ export default function MandarinaPro() {
         {step === 1 && (
           <div style={{animation:"fadeIn 0.4s ease",textAlign:"center",paddingTop:20}}>
             <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",letterSpacing:"0.1em",marginBottom:12}}>GENERANDO TU CAMPAÑA</div>
+            {(() => {
+              const total = selectedPrompts.length;
+              const done = variants.filter(v => v?.dataUrl || v?.error).length;
+              const pct = total ? Math.round((done / total) * 100) : 0;
+              return (
+                <div style={{maxWidth:520,margin:"0 auto 18px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"rgba(255,255,255,0.4)",marginBottom:5}}>
+                    <span>{done} de {total} imágenes</span><span>{pct}%</span>
+                  </div>
+                  <div style={{height:6,borderRadius:4,background:"rgba(255,255,255,0.06)",overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${pct}%`,background:"linear-gradient(90deg,#ff8c42,#e63946)",borderRadius:4,transition:"width 0.4s ease"}}/>
+                  </div>
+                </div>
+              );
+            })()}
             <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,marginBottom:16}}>
               {PROMPT_STYLES.filter(p=>selectedPrompts.includes(p.id)).map((s,i)=>{
                 const v=variants[i]; const isP=i===promptIdx; const isG=i===genIdx; const done=!!v?.dataUrl;
@@ -783,13 +923,26 @@ export default function MandarinaPro() {
                   })}
                 </div>
 
-                {selImg?.dataUrl&&(
+                {selImg?.regenerating&&(
+                  <div style={{borderRadius:11,marginBottom:9,minHeight:200,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#0d0d0d",border:"1px solid rgba(255,140,66,0.2)"}}>
+                    <div style={{fontSize:24,animation:"spin 1s linear infinite"}}>⚡</div>
+                    <div style={{fontSize:10,color:"#ff9f5a",marginTop:6}}>Regenerando {selImg.label}...</div>
+                  </div>
+                )}
+                {selImg?.dataUrl&&!selImg?.regenerating&&(
                   <div style={{borderRadius:11,overflow:"hidden",marginBottom:9,position:"relative"}}>
                     <img src={selImg.dataUrl} style={{width:"100%",maxHeight:260,objectFit:"cover",display:"block"}}/>
                     <div style={{position:"absolute",bottom:8,right:8,display:"flex",gap:5}}>
                       <button onClick={()=>dl(selImg,selectedV)} style={{background:"rgba(0,0,0,0.7)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:7,color:"#fff",fontSize:9,cursor:"pointer",padding:"5px 9px",fontFamily:"inherit"}}>⬇ Descargar</button>
+                      <button onClick={()=>regenerateVariant(selectedV)} style={{background:"rgba(0,0,0,0.7)",border:"1px solid rgba(150,200,255,0.35)",borderRadius:7,color:"#9cc8ff",fontSize:9,cursor:"pointer",padding:"5px 9px",fontFamily:"inherit"}}>🔄 Regenerar</button>
                       <button onClick={()=>setExpandedEditor(expandedEditor===selectedV?null:selectedV)} style={{background:expandedEditor===selectedV?"rgba(255,140,66,0.25)":"rgba(0,0,0,0.7)",border:"1px solid rgba(255,140,66,0.35)",borderRadius:7,color:"#ff9f5a",fontSize:9,cursor:"pointer",padding:"5px 9px",fontFamily:"inherit"}}>✏️ Editar foto</button>
                     </div>
+                  </div>
+                )}
+                {!selImg?.dataUrl&&!selImg?.regenerating&&selImg?.error&&(
+                  <div style={{borderRadius:11,marginBottom:9,padding:16,background:"rgba(255,80,80,0.06)",border:"1px solid rgba(255,80,80,0.2)",textAlign:"center"}}>
+                    <div style={{fontSize:11,color:"#ff9999",marginBottom:9,lineHeight:1.5}}>❌ {selImg.error}</div>
+                    <button onClick={()=>regenerateVariant(selectedV)} style={{padding:"7px 16px",background:"linear-gradient(135deg,#ff8c42,#e63946)",border:"none",borderRadius:8,color:"#fff",fontSize:11,fontWeight:"bold",cursor:"pointer",fontFamily:"inherit"}}>🔄 Reintentar esta variante</button>
                   </div>
                 )}
 

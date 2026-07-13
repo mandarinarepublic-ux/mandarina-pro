@@ -8,11 +8,15 @@
 // Admin listo para revisar y publicar con un click. Así una acción externa
 // nunca deja algo en vivo sin que el usuario lo confirme.
 
+import { sameOriginOk, isAuthed } from './_auth.js';
+
 const API_VERSION = '2024-10';
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (!sameOriginOk(req)) return res.status(403).json({ error: 'Origen no permitido' });
+  if (!isAuthed(req)) return res.status(401).json({ error: 'Sesión no autorizada. Inicia sesión.' });
 
   const store = process.env.SHOPIFY_STORE;
   const token = process.env.SHOPIFY_ADMIN_TOKEN;
