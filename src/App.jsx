@@ -159,10 +159,11 @@ CRITICAL RULES:
   return { prompt, tokens };
 }
 
+// Único modelo de imagen válido hoy en la API. Los antiguos
+// (gemini-2.0-flash-exp-image-generation, gemini-2.5-flash-preview-05-20)
+// devuelven 404 — se quitaron para no gastar llamadas fallidas.
 const GEMINI_MODELS = [
-  'gemini-2.0-flash-exp-image-generation',
   'gemini-2.5-flash-image',
-  'gemini-2.5-flash-preview-05-20',
 ];
 
 async function tryGeminiModel(model, parts) {
@@ -231,7 +232,7 @@ async function editImage(currentBase64, frontBase64, instruction, backBase64, mo
 
   const res = await fetch("/api/gemini", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "gemini-2.0-flash-exp-image-generation", contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE","TEXT"], temperature: 0.3 } })
+    body: JSON.stringify({ model: "gemini-2.5-flash-image", contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE","TEXT"], temperature: 0.3 } })
   });
   const data = await res.json();
   const imgPart = (data.candidates?.[0]?.content?.parts || []).find(p => p.inlineData?.mimeType?.startsWith("image/"));
