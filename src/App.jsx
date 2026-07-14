@@ -1,6 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
-// ─── 10 PROMPT STYLES ────────────────────────────────────────────────────────
+// ─── 11 PROMPT STYLES ────────────────────────────────────────────────────────
+// Cada estilo trae un `imperfection`: el defecto de cámara MÁS creíble para ese
+// escenario (motion blur, foco errado, luz mixta, grano ISO...). Se combina con
+// REALISM_LAYER para romper el look "IA perfecta".
 const PROMPT_STYLES = [
   {
     id: "mirror_selfie",
@@ -8,7 +11,8 @@ const PROMPT_STYLES = [
     emoji: "🤳",
     category: "Social",
     desc: "Selfie espejo, cuarto o baño real",
-    basePrompt: `Authentic iPhone mirror selfie, portrait crop (shoulders to mid-torso), like a real person's Instagram story. Shot in a real bedroom or bathroom — slightly messy shelves, everyday objects in background, real indoor lighting from bulb or window. Model holds phone at chest height partially blocking face. One hand in pocket or touching hair. Relaxed, unstaged posture. Slight grain, natural skin, real fabric wrinkles. NOT a studio shot. Feels like a friend took it.`
+    basePrompt: `Authentic iPhone mirror selfie, portrait crop (shoulders to mid-torso), like a real person's Instagram story. Shot in a real bedroom or bathroom — slightly messy shelves, everyday objects in background, real indoor lighting from bulb or window. Model holds phone at chest height partially blocking face. One hand in pocket or touching hair. Relaxed, unstaged posture. Slight grain, natural skin, real fabric wrinkles. NOT a studio shot. Feels like a friend took it.`,
+    imperfection: `Harsh phone flash reflecting as a bright hotspot in the mirror, faint fingerprints and smudges on the mirror glass, slight camera shake from the hand holding the phone.`
   },
   {
     id: "friends_photo",
@@ -16,7 +20,8 @@ const PROMPT_STYLES = [
     emoji: "👥",
     category: "Social",
     desc: "Foto casual como con amigos, crop hombros",
-    basePrompt: `Candid photo taken by a friend, portrait crop from shoulders up or chest up. Outdoor setting: sidewalk, park bench, outside a cafe or building entrance. Natural daylight, slightly overcast or golden hour. Model laughing or looking slightly off camera with a natural relaxed smile. Background slightly blurred with real urban or park elements. Shot on iPhone, warm tones, authentic. The garment is clearly visible from shoulders to waist.`
+    basePrompt: `Candid photo taken by a friend, portrait crop from shoulders up or chest up. Outdoor setting: sidewalk, park bench, outside a cafe or building entrance. Natural daylight, slightly overcast or golden hour. Model laughing or looking slightly off camera with a natural relaxed smile. Background slightly blurred with real urban or park elements. Shot on iPhone, warm tones, authentic. The garment is clearly visible from shoulders to waist.`,
+    imperfection: `Subject framed slightly off-center with a bit of dead space, focus landing a touch behind the face, faintly tilted horizon like a quick snap.`
   },
   {
     id: "outfit_check",
@@ -24,7 +29,8 @@ const PROMPT_STYLES = [
     emoji: "🪞",
     category: "Social",
     desc: "GRWM, cuarto propio, foto de arriba",
-    basePrompt: `Get-ready-with-me style photo, 3/4 crop (head to hips), taken in a real bedroom. Bed, closet, or plain wall in background. Natural window light from the side. Model standing straight looking at camera or slightly down at outfit. Relaxed confident expression. Real room, real lighting — not a studio. iPhone camera, slight soft focus, warm natural tones. Shows the full garment from neck to hip clearly.`
+    basePrompt: `Get-ready-with-me style photo, 3/4 crop (head to hips), taken in a real bedroom. Bed, closet, or plain wall in background. Natural window light from the side. Model standing straight looking at camera or slightly down at outfit. Relaxed confident expression. Real room, real lighting — not a studio. iPhone camera, slight soft focus, warm natural tones. Shows the full garment from neck to hip clearly.`,
+    imperfection: `Mild overexposure where the window light hits (a small blown-out highlight), the face slightly soft-focused, uneven brightness across the frame.`
   },
   {
     id: "street_candid",
@@ -32,7 +38,8 @@ const PROMPT_STYLES = [
     emoji: "🏙️",
     category: "Street",
     desc: "Calle urbana, foto de pasada, natural",
-    basePrompt: `Candid-style street photo, portrait or 3/4 crop. Model walking on a real sidewalk or standing at a street corner. Real city background: buildings, parked cars, people slightly blurred in distance. Overcast natural light or golden hour. Model not posing — mid-walk, looking at phone or glancing sideways. Shot from waist height. iPhone photo feel, real street textures, authentic not staged.`
+    basePrompt: `Candid-style street photo, portrait or 3/4 crop. Model walking on a real sidewalk or standing at a street corner. Real city background: buildings, parked cars, people slightly blurred in distance. Overcast natural light or golden hour. Model not posing — mid-walk, looking at phone or glancing sideways. Shot from waist height. iPhone photo feel, real street textures, authentic not staged.`,
+    imperfection: `Real walking motion blur on the body, autofocus grabbing a background car or sign instead of the subject, slightly crooked framing.`
   },
   {
     id: "coffee_hang",
@@ -40,7 +47,8 @@ const PROMPT_STYLES = [
     emoji: "☕",
     category: "Lifestyle",
     desc: "Dentro de café, copa en mano, media foto",
-    basePrompt: `Casual cafe photo, portrait crop (head to chest or waist). Model sitting or leaning at a cafe table or counter, holding a coffee cup. Real cafe interior: wooden tables, soft ambient lighting, blurred background with other customers or shelves. Warm indoor light. Natural casual expression, not posing. Shot from across the table like a friend took it. Shows garment clearly from shoulders to mid-torso.`
+    basePrompt: `Casual cafe photo, portrait crop (head to chest or waist). Model sitting or leaning at a cafe table or counter, holding a coffee cup. Real cafe interior: wooden tables, soft ambient lighting, blurred background with other customers or shelves. Warm indoor light. Natural casual expression, not posing. Shot from across the table like a friend took it. Shows garment clearly from shoulders to mid-torso.`,
+    imperfection: `Low-light ISO grain in the shadow areas, mixed white balance (warm interior against a small blown-out window in the background), slightly soft focus.`
   },
   {
     id: "rooftop_golden",
@@ -48,7 +56,8 @@ const PROMPT_STYLES = [
     emoji: "🌇",
     category: "Lifestyle",
     desc: "Azotea, luz dorada, foto de amigo",
-    basePrompt: `Rooftop photo during golden hour, 3/4 crop (head to hips). Model leaning on a railing or ledge, city skyline softly blurred behind. Warm orange and pink sunset light hitting the face and garment naturally. Relaxed expression, one hand in pocket. Shot by a friend from slightly below eye level. iPhone photo, warm color grade, feels like an evening hangout not a photoshoot.`
+    basePrompt: `Rooftop photo during golden hour, 3/4 crop (head to hips). Model leaning on a railing or ledge, city skyline softly blurred behind. Warm orange and pink sunset light hitting the face and garment naturally. Relaxed expression, one hand in pocket. Shot by a friend from slightly below eye level. iPhone photo, warm color grade, feels like an evening hangout not a photoshoot.`,
+    imperfection: `Sun lens flare and slight haze washing part of the frame, the face a bit underexposed against the bright backlight, warm color cast not corrected.`
   },
   {
     id: "gym_lobby",
@@ -56,7 +65,8 @@ const PROMPT_STYLES = [
     emoji: "💪",
     category: "Sport",
     desc: "Salida del gym, foto rápida, crop hombros",
-    basePrompt: `Post-workout casual photo, portrait crop (shoulders to waist). Model in a gym lobby, parking lot outside a gym, or on a sidewalk. Real environment: gym bags, cars, or building entrance visible and blurred. Natural daylight or gym fluorescent light. Model looks relaxed, slight smile, confident energy. Not flexing — just wearing the outfit casually. Shot on iPhone by a friend. Garment clearly visible.`
+    basePrompt: `Post-workout casual photo, portrait crop (shoulders to waist). Model in a gym lobby, parking lot outside a gym, or on a sidewalk. Real environment: gym bags, cars, or building entrance visible and blurred. Natural daylight or gym fluorescent light. Model looks relaxed, slight smile, confident energy. Not flexing — just wearing the outfit casually. Shot on iPhone by a friend. Garment clearly visible.`,
+    imperfection: `Unflattering greenish fluorescent color cast, a slight sweat sheen highlight on the skin, mild overexposure under the ceiling lights.`
   },
   {
     id: "home_couch",
@@ -64,7 +74,8 @@ const PROMPT_STYLES = [
     emoji: "🛋️",
     category: "Lifestyle",
     desc: "Foto en casa, sofá o sala, muy real",
-    basePrompt: `Cozy home photo, portrait crop (shoulders to waist or 3/4). Model sitting on a couch or standing in a living room or kitchen. Real home setting: cushions, TV, plants, everyday objects softly blurred. Warm ambient indoor lighting. Very relaxed, natural expression — could be watching TV or scrolling phone. Shot casually by hand. Feels completely real and unstaged. Garment visible from neck to hip.`
+    basePrompt: `Cozy home photo, portrait crop (shoulders to waist or 3/4). Model sitting on a couch or standing in a living room or kitchen. Real home setting: cushions, TV, plants, everyday objects softly blurred. Warm ambient indoor lighting. Very relaxed, natural expression — could be watching TV or scrolling phone. Shot casually by hand. Feels completely real and unstaged. Garment visible from neck to hip.`,
+    imperfection: `Warm orange color cast from a single lamp, slight overall underexposure with grain in the shadows, gently soft hand-held focus.`
   },
   {
     id: "night_out",
@@ -72,7 +83,8 @@ const PROMPT_STYLES = [
     emoji: "🌙",
     category: "Social",
     desc: "Salida nocturna, luz de bar, foto con amigos",
-    basePrompt: `Night out photo, portrait crop (shoulders to chest). Inside a bar, restaurant, or club with warm dim ambient lighting. Neon or warm string lights in background, blurred. Model smiling or laughing naturally — mid-conversation energy. Slight motion, real night atmosphere. Shot on iPhone at night with natural grain and warm tones. Feels like a real social outing photo, not a photoshoot.`
+    basePrompt: `Night out photo, portrait crop (shoulders to chest). Inside a bar, restaurant, or club with warm dim ambient lighting. Neon or warm string lights in background, blurred. Model smiling or laughing naturally — mid-conversation energy. Slight motion, real night atmosphere. Shot on iPhone at night with natural grain and warm tones. Feels like a real social outing photo, not a photoshoot.`,
+    imperfection: `Heavy night-time ISO grain, real motion blur from low shutter speed, strong orange/neon color cast, the subject slightly underexposed and dim.`
   },
   {
     id: "park_sunny",
@@ -80,7 +92,8 @@ const PROMPT_STYLES = [
     emoji: "🌳",
     category: "Lifestyle",
     desc: "Parque, luz natural, foto relajada",
-    basePrompt: `Sunny park photo, portrait or 3/4 crop (head to hips). Model sitting on grass, a bench, or leaning against a tree. Real park: green trees, natural light filtering through leaves, soft dappled shadows. Relaxed natural expression, looking at camera or slightly away. Shot by a friend from eye level. iPhone photo, natural warm daylight, feels like a real weekend afternoon. Garment clearly visible.`
+    basePrompt: `Sunny park photo, portrait or 3/4 crop (head to hips). Model sitting on grass, a bench, or leaning against a tree. Real park: green trees, natural light filtering through leaves, soft dappled shadows. Relaxed natural expression, looking at camera or slightly away. Shot by a friend from eye level. iPhone photo, natural warm daylight, feels like a real weekend afternoon. Garment clearly visible.`,
+    imperfection: `Harsh dappled sunlight creating small blown-out highlights and hard shadows on the face, the lens a touch soft, slightly uneven exposure.`
   },
   {
     id: "custom_prompt",
@@ -91,6 +104,21 @@ const PROMPT_STYLES = [
     basePrompt: "__CUSTOM__"
   },
 ];
+
+// ─── CAPA DE REALISMO (intensidad media) ──────────────────────────────────────
+// Se anexa a TODOS los prompts. Rompe el look "IA perfecta" con defectos leves y
+// creíbles de foto de celular, SIN tocar la fidelidad de la prenda (producto).
+const REALISM_LAYER = `
+
+REALISM — the final image must read as a REAL amateur phone photo, NOT a clean AI render or a polished studio shot. Introduce subtle, believable flaws:
+- Focus is slightly imperfect: the face a touch soft, or the sharpest point landing just behind the subject; a hint of hand-held motion blur.
+- Lighting is uneven and a little unflattering the way real light is: one side brighter, a small blown-out highlight, mild shadow clipping in dark areas.
+- Imperfect, un-corrected white balance: slightly too warm (tungsten) or a faint green/cool cast.
+- Faint sensor noise / ISO grain in the shadows and light JPEG compression artifacts.
+- Casual, imperfect framing: subject a little off-center, horizon slightly tilted.
+- Real skin texture: visible pores, minor unevenness and blemishes, faint under-eye shadow — NOT airbrushed, NOT plastic-smooth.
+Avoid: perfect symmetry, flawless even studio lighting, over-sharpening, waxy skin, HDR glow.
+CRITICAL: keep the GARMENT itself sharp, correctly colored, and its logos/text/design fully legible. These imperfections apply to lighting, focus, grain and framing ONLY — never to the product's colors or design.`;
 
 // Default selection (first 5 for generation)
 
@@ -127,6 +155,14 @@ BASE PROMPT TEMPLATE (keep ALL the professional language, ONLY fill the brackets
 ${scene.basePrompt}
 ---
 
+SCENE-SPECIFIC IMPERFECTION (weave this camera flaw naturally into the scene):
+${scene.imperfection || "subtle, believable phone-camera imperfections"}
+
+REALISM BLOCK (append this VERBATIM at the end of the final prompt, unchanged):
+---
+${REALISM_LAYER.trim()}
+---
+
 FILL IN THESE SPECIFICS from the garment photo:
 - [GARMENT TYPE]: exact type (hoodie, tee, jacket, etc)
 - [EXACT COLORS]: every color you see in the garment
@@ -141,15 +177,16 @@ CRITICAL RULES:
 1. Keep the FULL base prompt structure and professional language intact
 2. Add the garment specifics seamlessly into the prompt
 3. The garment description must be PRECISE enough that an AI generates EXACTLY this garment
-4. End with: "MANDATORY: The model wears EXACTLY this garment — same [exact colors], same [exact design]. No substitutions."
-5. Output ONLY the final completed prompt, no explanation, no brackets remaining.` });
+4. Weave in the SCENE-SPECIFIC IMPERFECTION, then append the REALISM BLOCK verbatim
+5. End with: "MANDATORY: The model wears EXACTLY this garment — same [exact colors], same [exact design]. No substitutions."
+6. Output ONLY the final completed prompt, no explanation, no brackets remaining.` });
 
   const res = await fetch("/api/claude", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 900,
+      max_tokens: 1200,
       messages: [{ role: "user", content: analysisParts }]
     })
   });
@@ -200,7 +237,7 @@ async function generateWithGemini(prompt, frontBase64, backBase64, modelBase64) 
   parts.push({ text: prompt });
   
   // Final mandatory reminder
-  parts.push({ text: "MANDATORY: (1) GARMENT must be identical to the product reference photos — same colors, design, logo. (2) If a person reference was provided, use their face/body ONLY — generate a completely new background per the style prompt, do NOT copy their original background. (3) Final result must look like a professional fashion campaign, not a composite of reference photos." });
+  parts.push({ text: "MANDATORY: (1) GARMENT must be identical to the product reference photos — same colors, design, logo, kept sharp and legible. (2) If a person reference was provided, use their face/body ONLY — generate a completely new background per the style prompt, do NOT copy their original background. (3) Final result must look like an AUTHENTIC amateur phone snapshot with natural imperfections — slightly imperfect focus/lighting, real grain, casual framing — NOT a clean polished studio campaign and NOT an obvious AI render. (4) The product itself stays crisp; only the lighting, focus, grain and framing carry the imperfections." });
 
   let lastError = '';
   for (const model of GEMINI_MODELS) {
@@ -594,8 +631,8 @@ export default function MandarinaPro() {
       try {
         const modelB64 = photoModel ? dataUrlToBase64(photoModel) : null;
         if (scene.id === "custom_prompt") {
-          // Prompt libre: usar exactamente lo que escribió el usuario
-          prompt = customPromptText.trim() || "Ultra realistic fashion photo showing the garment from the reference photo.";
+          // Prompt libre: lo que escribió el usuario + capa de realismo
+          prompt = (customPromptText.trim() || "Ultra realistic fashion photo showing the garment from the reference photo.") + REALISM_LAYER;
         } else {
           const r = await analyzeAndBuildPrompt(frontB64, backB64, productInfo, promptGuide, scene, modelB64);
           prompt = r.prompt;
@@ -603,7 +640,7 @@ export default function MandarinaPro() {
         }
       } catch(e) {
         console.error('Prompt analysis error:', e.message);
-        prompt = `Ultra realistic fashion photo. ${scene.basePrompt?.substring(0,200) || scene.label}. The person is wearing the exact garment from the reference photo. MUST look like a real photograph, not AI generated.`;
+        prompt = `Ultra realistic fashion photo. ${scene.basePrompt?.substring(0,200) || scene.label}. ${scene.imperfection || ""} The person is wearing the exact garment from the reference photo.${REALISM_LAYER}`;
       }
       setGenIdx(i); setPromptIdx(-1);
       try {
@@ -656,7 +693,7 @@ export default function MandarinaPro() {
     try {
       let prompt;
       if (scene.id === "custom_prompt") {
-        prompt = customPromptText.trim() || "Ultra realistic fashion photo showing the garment from the reference photo.";
+        prompt = (customPromptText.trim() || "Ultra realistic fashion photo showing the garment from the reference photo.") + REALISM_LAYER;
       } else {
         const r = await analyzeAndBuildPrompt(frontB64, backB64, productInfo, promptGuide, scene, modelB64);
         prompt = r.prompt;
