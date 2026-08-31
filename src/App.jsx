@@ -95,26 +95,69 @@ const PROMPT_STYLES = [
 // Default selection (first 5 for generation)
 
 // ─── APIs ─────────────────────────────────────────────────────────────────────
+
+// Modelo de TEXTO (analizar la prenda + escribir el copy). El de imagen es otro
+// (GEMINI_MODELS, más abajo). Para ver qué modelos ve tu key de verdad, abre
+// /api/gemini con sesión iniciada: lista los que aceptan generateContent.
+const GEMINI_TEXTO = "gemini-2.5-flash";
+
+// Llamada de texto a Gemini. Devuelve { texto, tokens } o lanza un error con
+// causa real: una respuesta vacía NUNCA se devuelve como "" en silencio.
+async function geminiTexto({ parts, systemInstruction, maxOutputTokens, json }) {
+  const generationConfig = { temperature: 0.7, maxOutputTokens };
+  if (json) generationConfig.responseMimeType = "application/json";
+
+  const res = await fetch("/api/gemini", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: GEMINI_TEXTO,
+      contents: [{ parts }],
+      generationConfig,
+      ...(systemInstruction ? { systemInstruction: { parts: [{ text: systemInstruction }] } } : {}),
+    })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message || "Error de Gemini");
+
+  const cand = data.candidates?.[0];
+  const tokens = (data.usageMetadata?.promptTokenCount||0)+(data.usageMetadata?.candidatesTokenCount||0);
+  // Las partes de "pensamiento" no son la respuesta: se descartan.
+  const texto = (cand?.content?.parts || []).filter(p => !p.thought && p.text).map(p => p.text).join("").trim();
+
+  if (!texto) {
+    const razon = cand?.finishReason || data.promptFeedback?.blockReason || "sin texto";
+    const explica = {
+      MAX_TOKENS: "se quedó sin tokens de salida (sube maxOutputTokens)",
+      SAFETY: "Gemini bloqueó la respuesta por filtros de contenido",
+      PROHIBITED_CONTENT: "Gemini bloqueó la respuesta por filtros de contenido",
+      RECITATION: "Gemini cortó la respuesta por recitación",
+    }[razon] || razon;
+    throw new Error(`Gemini no devolvió texto: ${explica}`);
+  }
+  return { texto, tokens };
+}
+
 async function analyzeAndBuildPrompt(frontBase64, backBase64, productInfo, userGuide, scene, modelBase64) {
-  // Step 1: Claude analyzes the garment and extracts key details
+  // Step 1: Gemini analiza la prenda y extrae los detalles clave
   const analysisParts = [
-    { type: "image", source: { type: "base64", media_type: "image/jpeg", data: frontBase64 } },
-    { type: "text", text: "GARMENT FRONT ↑" },
+    { inline_data: { mime_type: "image/jpeg", data: frontBase64 } },
+    { text: "GARMENT FRONT ↑" },
   ];
   if (backBase64) {
-    analysisParts.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: backBase64 } });
-    analysisParts.push({ type: "text", text: "GARMENT BACK ↑" });
+    analysisParts.push({ inline_data: { mime_type: "image/jpeg", data: backBase64 } });
+    analysisParts.push({ text: "GARMENT BACK ↑" });
   }
   if (modelBase64) {
-    analysisParts.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: modelBase64 } });
-    analysisParts.push({ type: "text", text: "REFERENCE PERSON ↑" });
+    analysisParts.push({ inline_data: { mime_type: "image/jpeg", data: modelBase64 } });
+    analysisParts.push({ text: "REFERENCE PERSON ↑" });
   }
 
   const modelInstruction = modelBase64
     ? "USE THE EXACT PERSON from the reference photo — same face, skin tone, hair, body. They must be recognizable."
     : `young latinx person, 20-25yo, ${userGuide || "authentic real look, not AI-perfect"}`;
 
-  analysisParts.push({ type: "text", text: `You are a professional fashion photographer and prompt engineer.
+  analysisParts.push({ text: `You are a professional fashion photographer and prompt engineer.
 
 Analyze the garment photo(s) carefully and complete this fashion photography prompt template by filling in the [BRACKETS] with ultra-specific details from what you actually see.
 
@@ -144,19 +187,10 @@ CRITICAL RULES:
 4. End with: "MANDATORY: The model wears EXACTLY this garment — same [exact colors], same [exact design]. No substitutions."
 5. Output ONLY the final completed prompt, no explanation, no brackets remaining.` });
 
-  const res = await fetch("/api/claude", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 900,
-      messages: [{ role: "user", content: analysisParts }]
-    })
-  });
-  const data = await res.json();
-  const prompt = data.content?.[0]?.text || "";
-  const tokens = (data.usage?.input_tokens||0)+(data.usage?.output_tokens||0);
-  return { prompt, tokens };
+  // maxOutputTokens holgado: el modelo piensa antes de responder y ese
+  // pensamiento gasta del mismo presupuesto. Corto = respuesta vacía.
+  const { texto, tokens } = await geminiTexto({ parts: analysisParts, maxOutputTokens: 4096 });
+  return { prompt: texto, tokens };
 }
 
 // Único modelo de imagen válido hoy en la API. Los antiguos
@@ -242,14 +276,8 @@ async function editImage(currentBase64, frontBase64, instruction, backBase64, mo
 }
 
 async function generateSEO(productInfo) {
-  const res = await fetch("/api/claude", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1500,
-      system: "Eres experto en neuromarketing, SEO avanzado para e-commerce de moda y community manager de Instagram con millones de seguidores. Técnicas: AIDA, PAS, ganchos emocionales, FOMO sutil, storytelling. Responde SOLO JSON válido sin backticks ni texto adicional.",
-      messages: [{ role: "user", content: `Crea contenido de ALTO IMPACTO para Mandarina Ecuador:
+  const instruccion = "Eres experto en neuromarketing, SEO avanzado para e-commerce de moda y community manager de Instagram con millones de seguidores. Técnicas: AIDA, PAS, ganchos emocionales, FOMO sutil, storytelling. Responde SOLO JSON válido sin backticks ni texto adicional.";
+  const pedido = `Crea contenido de ALTO IMPACTO para Mandarina Ecuador:
 Producto: ${productInfo.name||"Prenda"} | Precio: $${productInfo.price||"XX"} | Color: ${productInfo.color||""} | Categoría: ${productInfo.category||"Ropa"} | Descripción: ${productInfo.description||""} | www.mandarinEc.com
 
 REGLAS DE NEUROMARKETING:
@@ -263,21 +291,15 @@ REGLAS DE NEUROMARKETING:
 - Reel hook: exactamente 4-5 palabras que hacen parar el scroll (ej: "Esto cambió mi look 🔥")
 
 JSON EXACTO:
-{"shopify":{"title":"","metaDescription":"","h1":"","bodyText":"","tags":["","","","","","",""],"googleAdsHeadline":"","googleAdsCTA":""},"instagram":{"caption":"","hashtags":"#mandarina #mandarinaec #modaecuador #ecuador #ootd #fashion #estilo #ropa #outfit #quito #streetwear #lookdeldia","cta":"","storyText":"","reelHook":""}}`
-      }]
-    })
+{"shopify":{"title":"","metaDescription":"","h1":"","bodyText":"","tags":["","","","","","",""],"googleAdsHeadline":"","googleAdsCTA":""},"instagram":{"caption":"","hashtags":"#mandarina #mandarinaec #modaecuador #ecuador #ootd #fashion #estilo #ropa #outfit #quito #streetwear #lookdeldia","cta":"","storyText":"","reelHook":""}}`;
+
+  const { texto, tokens } = await geminiTexto({
+    parts: [{ text: pedido }],
+    systemInstruction: instruccion,
+    maxOutputTokens: 4096,
+    json: true, // Gemini garantiza JSON válido; ya no hay que limpiar backticks
   });
-  const data = await res.json();
-  // Show diagnostic if API key missing
-  if (data.error && data.hint) {
-    throw new Error("❌ " + data.error + " — " + data.hint);
-  }
-  if (data.error?.type === "authentication_error") {
-    throw new Error("❌ API key inválida. Ve a Vercel → Settings → Environment Variables y agrega ANTHROPIC_API_KEY");
-  }
-  const tokens = (data.usage?.input_tokens||0)+(data.usage?.output_tokens||0);
-  const text = data.content?.[0]?.text || "{}";
-  try { return { result: JSON.parse(text.replace(/```json|```/g,"").trim()), tokens }; }
+  try { return { result: JSON.parse(texto.replace(/```json|```/g,"").trim()), tokens }; }
   catch { return { result: null, tokens }; }
 }
 
@@ -471,7 +493,6 @@ function LoginScreen({ onOk }) {
 function HealthBadge({ health }) {
   if (!health) return null;
   const items = [
-    { k: "anthropic", l: "Claude" },
     { k: "gemini", l: "Gemini" },
     { k: "shopify", l: "Shopify" },
   ];
@@ -550,7 +571,7 @@ export default function MandarinaPro() {
   }, [draftLoaded, productInfo, promptGuide, customPromptText, selectedPrompts]);
 
   const totalTokens = tokens.reduce((a,b)=>a+b.tokens,0);
-  const totalCost = tokens.reduce((a,b)=>a+b.tokens*(b.type==="image"?0.00003:0.000003),0).toFixed(4);
+  const totalCost = tokens.reduce((a,b)=>a+b.tokens*(b.type==="image"?0.00003:0.000001),0).toFixed(4);
 
   const readFile = useCallback((file, setter) => {
     if (!file) return;
@@ -714,7 +735,7 @@ export default function MandarinaPro() {
         {step === 0 && (
           <div style={{animation:"fadeIn 0.4s ease"}}>
             <h1 style={{fontSize:26,fontWeight:"normal",color:"#ff9f5a",marginBottom:4}}>Sube tu producto</h1>
-            <p style={{color:"rgba(255,255,255,0.35)",marginBottom:20,fontSize:12}}>Claude analiza frente y espalda → construye prompts ultra-realistas → Gemini genera modelos reales</p>
+            <p style={{color:"rgba(255,255,255,0.35)",marginBottom:20,fontSize:12}}>Gemini analiza frente y espalda → construye prompts ultra-realistas → genera modelos reales</p>
 
             <div style={{display:"grid",gridTemplateColumns:"300px 1fr",gap:18}}>
               <div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -837,7 +858,7 @@ export default function MandarinaPro() {
                     rows={4}
                     style={{width:"100%",padding:"9px 11px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,215,0,0.15)",borderRadius:8,color:"#f5f0eb",fontSize:11,outline:"none",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box",lineHeight:1.6}}
                   />
-                  <div style={{fontSize:9,color:"rgba(255,215,0,0.4)",marginTop:4}}>⚡ Claude no modifica este prompt — se envía directo a Gemini sin cambios</div>
+                  <div style={{fontSize:9,color:"rgba(255,215,0,0.4)",marginTop:4}}>⚡ Este prompt no se modifica — se envía directo al generador de imágenes sin cambios</div>
                 </div>
               )}
             </div>
@@ -1057,7 +1078,7 @@ export default function MandarinaPro() {
               <div style={{background:"rgba(255,200,50,0.04)",border:"1px solid rgba(255,200,50,0.1)",borderRadius:11,padding:13,marginBottom:12}}>
                 <div style={{fontSize:9,color:"#ffd060",marginBottom:8}}>⚡ RESUMEN</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3}}>
-                  {tokens.map((t,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:9,padding:"2px 0"}}><span style={{color:"rgba(255,255,255,0.35)"}}>{t.type==="image"?"🖼️":"📝"} {t.label}</span><span style={{color:"#ffd060"}}>{t.tokens.toLocaleString()} · ${(t.tokens*(t.type==="image"?0.00003:0.000003)).toFixed(4)}</span></div>)}
+                  {tokens.map((t,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:9,padding:"2px 0"}}><span style={{color:"rgba(255,255,255,0.35)"}}>{t.type==="image"?"🖼️":"📝"} {t.label}</span><span style={{color:"#ffd060"}}>{t.tokens.toLocaleString()} · ${(t.tokens*(t.type==="image"?0.00003:0.000001)).toFixed(4)}</span></div>)}
                 </div>
                 <div style={{display:"flex",justifyContent:"space-between",marginTop:7,fontSize:11,fontWeight:"bold",color:"#ffd060",borderTop:"1px solid rgba(255,200,50,0.1)",paddingTop:6}}>
                   <span>TOTAL</span><span>{totalTokens.toLocaleString()} · ~${totalCost} USD</span>
