@@ -108,7 +108,15 @@ const GEMINI_TEXTO = "gemini-3.6-flash";
 // Llamada de texto a Gemini. Devuelve { texto, tokens } o lanza un error con
 // causa real: una respuesta vacía NUNCA se devuelve como "" en silencio.
 async function geminiTexto({ parts, systemInstruction, maxOutputTokens, json }) {
-  const generationConfig = { temperature: 0.7, maxOutputTokens };
+  const generationConfig = {
+    temperature: 0.7,
+    maxOutputTokens,
+    // ☠️ El "pensamiento" del modelo SALE DEL MISMO presupuesto que la respuesta.
+    // Sin esto gastaba 3.931 tokens pensando y dejaba 161 para escribir: el JSON
+    // llegaba cortado y JSON.parse reventaba (la app se quedaba sin copy).
+    // Ni analizar una prenda ni escribir un caption necesitan pensar tanto.
+    thinkingConfig: { thinkingLevel: "low" },
+  };
   if (json) generationConfig.responseMimeType = "application/json";
 
   const res = await fetch("/api/gemini", {
@@ -125,14 +133,17 @@ async function geminiTexto({ parts, systemInstruction, maxOutputTokens, json }) 
   if (data.error) throw new Error(data.error.message || "Error de Gemini");
 
   const cand = data.candidates?.[0];
-  const tokens = (data.usageMetadata?.promptTokenCount||0)+(data.usageMetadata?.candidatesTokenCount||0);
+  // thoughtsTokenCount TAMBIÉN se cobra y suele ser el grueso del gasto:
+  // dejarlo fuera hacía que el contador de costos mintiera por defecto.
+  const u = data.usageMetadata || {};
+  const tokens = (u.promptTokenCount||0)+(u.candidatesTokenCount||0)+(u.thoughtsTokenCount||0);
   // Las partes de "pensamiento" no son la respuesta: se descartan.
   const texto = (cand?.content?.parts || []).filter(p => !p.thought && p.text).map(p => p.text).join("").trim();
 
   if (!texto) {
     const razon = cand?.finishReason || data.promptFeedback?.blockReason || "sin texto";
     const explica = {
-      MAX_TOKENS: "se quedó sin tokens de salida (sube maxOutputTokens)",
+      MAX_TOKENS: "se quedó sin tokens de salida (sube maxOutputTokens o baja thinkingLevel)",
       SAFETY: "Gemini bloqueó la respuesta por filtros de contenido",
       PROHIBITED_CONTENT: "Gemini bloqueó la respuesta por filtros de contenido",
       RECITATION: "Gemini cortó la respuesta por recitación",
@@ -193,7 +204,7 @@ CRITICAL RULES:
 
   // maxOutputTokens holgado: el modelo piensa antes de responder y ese
   // pensamiento gasta del mismo presupuesto. Corto = respuesta vacía.
-  const { texto, tokens } = await geminiTexto({ parts: analysisParts, maxOutputTokens: 4096 });
+  const { texto, tokens } = await geminiTexto({ parts: analysisParts, maxOutputTokens: 8192 });
   return { prompt: texto, tokens };
 }
 
@@ -300,7 +311,7 @@ JSON EXACTO:
   const { texto, tokens } = await geminiTexto({
     parts: [{ text: pedido }],
     systemInstruction: instruccion,
-    maxOutputTokens: 4096,
+    maxOutputTokens: 8192,
     json: true, // Gemini garantiza JSON válido; ya no hay que limpiar backticks
   });
   try { return { result: JSON.parse(texto.replace(/```json|```/g,"").trim()), tokens }; }
