@@ -97,9 +97,13 @@ const PROMPT_STYLES = [
 // ─── APIs ─────────────────────────────────────────────────────────────────────
 
 // Modelo de TEXTO (analizar la prenda + escribir el copy). El de imagen es otro
-// (GEMINI_MODELS, más abajo). Para ver qué modelos ve tu key de verdad, abre
-// /api/gemini con sesión iniciada: lista los que aceptan generateContent.
-const GEMINI_TEXTO = "gemini-2.5-flash";
+// (GEMINI_MODELS, más abajo).
+// ⚠️ Antes de cambiar este ID: que aparezca en la lista NO significa que sirva.
+// GET /api/gemini lista los modelos de la key, pero gemini-2.5-flash sale ahí y
+// al usarlo devuelve 404 ("no longer available to new users"). La única prueba
+// válida es un POST real. Verificado el 30-ago-2026 con una foto de prenda.
+// Tampoco uses los alias "-latest": se mueven solos y rompen sin aviso.
+const GEMINI_TEXTO = "gemini-3.6-flash";
 
 // Llamada de texto a Gemini. Devuelve { texto, tokens } o lanza un error con
 // causa real: una respuesta vacía NUNCA se devuelve como "" en silencio.
